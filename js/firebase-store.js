@@ -153,6 +153,16 @@ export async function closeEvent(eventId) {
   await update(ref(database, `events/${eventId}/public`), { status: 'closed' });
 }
 
+export async function deleteEvent(eventId) {
+  await ensureAuth();
+  await update(ref(database), {
+    [`events/${eventId}`]: null,
+    [`eventCatalog/${eventId}`]: null,
+    [`adminKeyClaims/${eventId}`]: null,
+    [`adminKeys/${eventId}`]: null,
+  });
+}
+
 export function isEventUnavailableError(error) {
   const code = String(error?.code || '').toLowerCase();
   const message = String(error?.message || '').toLowerCase();

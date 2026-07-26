@@ -6,7 +6,7 @@
       ".read": "auth != null",
       ".indexOn": ["expires_at"],
       "$eventId": {
-        ".write": "auth != null && !data.exists() && newData.exists() && root.child('events').child($eventId).child('public').child('created_by').val() === auth.uid",
+        ".write": "auth != null && ((!data.exists() && newData.exists() && root.child('events').child($eventId).child('public').child('created_by').val() === auth.uid) || (data.exists() && !newData.exists() && root.child('adminKeys').child($eventId).isString() && root.child('adminKeyClaims').child($eventId).child(auth.uid).val() === root.child('adminKeys').child($eventId).val()))",
         ".validate": "$eventId.matches(/^e\\d{3}-\\d{3}-\\d{3}$/) && newData.hasChildren(['event_id', 'created_at', 'expires_at']) && newData.child('event_id').val() === $eventId && newData.child('created_at').val() === root.child('events').child($eventId).child('public').child('created_at').val() && newData.child('expires_at').val() === root.child('events').child($eventId).child('public').child('expires_at').val()"
       }
     },
@@ -20,6 +20,7 @@
     "adminKeyClaims": {
       "$eventId": {
         ".read": false,
+        ".write": "auth != null && data.exists() && !newData.exists() && root.child('adminKeys').child($eventId).isString() && data.child(auth.uid).val() === root.child('adminKeys').child($eventId).val()",
         "$uid": {
           ".write": "auth != null && auth.uid === $uid && root.child('adminKeys').child($eventId).isString() && newData.val() === root.child('adminKeys').child($eventId).val()",
           ".validate": "newData.isString() && newData.val().matches(/^\\d{6}$/)"
@@ -28,6 +29,7 @@
     },
     "events": {
       "$eventId": {
+        ".write": "auth != null && data.exists() && !newData.exists() && root.child('adminKeys').child($eventId).isString() && root.child('adminKeyClaims').child($eventId).child(auth.uid).val() === root.child('adminKeys').child($eventId).val()",
         "public": {
           ".read": "auth != null && data.child('expires_at').isNumber() && data.child('expires_at').val() > now",
           ".write": "auth != null && !data.exists() && newData.child('created_by').val() === auth.uid && root.child('adminKeys').child($eventId).isString() && root.child('adminKeyClaims').child($eventId).child(auth.uid).val() === root.child('adminKeys').child($eventId).val()",

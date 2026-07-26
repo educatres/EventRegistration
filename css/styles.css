@@ -84,6 +84,9 @@ dd { margin: 4px 0 0; overflow-wrap: anywhere; font-weight: 700; }
 .admin-form { display: grid; grid-template-columns: minmax(220px, 360px) max-content; gap: 12px; align-items: end; }
 .admin-form label { margin: 0; }
 .danger-panel { border-color: #efd1d1; }
+.delete-event-block { margin-top: 24px; border-top: 1px solid #efd1d1; padding-top: 20px; }
+.delete-event-block h3 { color: var(--danger); }
+.delete-event-dialog code { color: var(--danger); font-weight: 900; }
 .deletion-countdown-panel { display: flex; gap: 24px; align-items: center; justify-content: space-between; border-color: var(--accent-soft); background: linear-gradient(135deg, #fff 0%, var(--surface-soft) 100%); }
 .deletion-countdown-panel .muted-text { margin: 8px 0 0; }
 .deletion-countdown { color: var(--accent-strong); font-size: clamp(1.25rem, 3vw, 2rem); font-variant-numeric: tabular-nums; white-space: nowrap; }

@@ -1,6 +1,6 @@
 import { eventAvailability, formatDateTime, fromDateTimeLocal, getEventId, toDateTimeLocal } from './config.js';
 import { renderDescription } from './content.js';
-import { claimAdminKey, closeEvent, isEventUnavailableError, subscribeEventPublic, subscribeRegistrations, updateEventSchedule } from './firebase-store.js';
+import { claimAdminKey, closeEvent, deleteEvent, isEventUnavailableError, subscribeEventPublic, subscribeRegistrations, updateEventSchedule } from './firebase-store.js';
 import { getLocalAdminKey, removeLocalEvent } from './local-events.js';
 
 const eventId = getEventId();
@@ -15,6 +15,11 @@ const scheduleForm = document.querySelector('#schedule-form');
 const table = document.querySelector('#registration-table');
 const deletionDate = document.querySelector('#deletion-date');
 const deletionCountdown = document.querySelector('#deletion-countdown');
+const deleteEventDialog = document.querySelector('#delete-event-dialog');
+const deleteEventId = document.querySelector('#delete-event-id');
+const deleteEventConfirmation = document.querySelector('#delete-event-confirmation');
+const deleteEventConfirm = document.querySelector('#delete-event-confirm');
+const deleteEventStatus = document.querySelector('#delete-event-status');
 let eventData;
 let registrations = [];
 let adminUnlocked = false;
@@ -69,6 +74,39 @@ document.querySelector('#close-registration')?.addEventListener('click', async (
 });
 
 document.querySelector('#download-csv')?.addEventListener('click', downloadCsv);
+
+document.querySelector('#delete-event')?.addEventListener('click', () => {
+  deleteEventId.textContent = eventId;
+  deleteEventConfirmation.value = '';
+  deleteEventConfirm.disabled = true;
+  deleteEventStatus.textContent = '';
+  deleteEventDialog.showModal();
+  deleteEventConfirmation.focus();
+});
+
+document.querySelector('#delete-event-cancel')?.addEventListener('click', () => deleteEventDialog.close());
+deleteEventDialog?.addEventListener('click', (event) => {
+  if (event.target === deleteEventDialog) deleteEventDialog.close();
+});
+
+deleteEventConfirmation?.addEventListener('input', () => {
+  deleteEventConfirm.disabled = deleteEventConfirmation.value.trim() !== eventId;
+});
+
+deleteEventConfirm?.addEventListener('click', async () => {
+  if (deleteEventConfirmation.value.trim() !== eventId) return;
+  deleteEventConfirm.disabled = true;
+  deleteEventStatus.textContent = '正在永久刪除活動與所有報名資料...';
+  try {
+    unsubscribeRegistrations?.();
+    await deleteEvent(eventId);
+    removeLocalEvent(eventId);
+    window.location.replace('./index.html');
+  } catch (error) {
+    deleteEventStatus.textContent = error?.message || '刪除失敗，請稍後再試。';
+    deleteEventConfirm.disabled = deleteEventConfirmation.value.trim() !== eventId;
+  }
+});
 
 async function beginSync() {
   try {

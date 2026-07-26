@@ -53,6 +53,11 @@
             <p class="muted-text">關閉後不再接受新報名，既有資料仍可下載至四週到期。此操作不可重新開啟。</p>
             <button id="close-registration" class="danger-btn" type="button">關閉報名</button>
             <p id="close-status" class="status-line"></p>
+            <div class="delete-event-block">
+              <h3>永久刪除活動</h3>
+              <p class="muted-text">立即刪除活動設定、所有報名資料與管理密鑰，刪除後無法復原。</p>
+              <button id="delete-event" class="danger-btn" type="button">永久刪除活動</button>
+            </div>
           </section>
         </section>
 
@@ -66,6 +71,19 @@
         </section>
       </div>
     </main>
+
+    <dialog id="delete-event-dialog" class="system-events-dialog delete-event-dialog">
+      <div class="dialog-header">
+        <div><p class="eyebrow">Danger zone</p><h2>確認永久刪除活動</h2></div>
+        <button id="delete-event-cancel" class="ghost-btn small-btn" type="button">取消</button>
+      </div>
+      <p>這會永久刪除活動 <code id="delete-event-id"></code> 及所有報名資料。請輸入完整活動 ID 以確認。</p>
+      <label><span>活動 ID</span><input id="delete-event-confirmation" autocomplete="off" spellcheck="false" /></label>
+      <div class="actions">
+        <button id="delete-event-confirm" class="danger-btn" type="button" disabled>確認永久刪除</button>
+      </div>
+      <p id="delete-event-status" class="status-line" aria-live="polite"></p>
+    </dialog>
     <script type="module" src="./js/results.js"></script>
   </body>
 </html>
