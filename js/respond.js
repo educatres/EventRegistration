@@ -1,135 +1,101 @@
-import { getMeetingId } from './config.js';
-import { isMeetingUnavailableError, submitResponse, subscribeMeetingSettings } from './firebase-store.js';
-import { buildSlots, groupSlotsByDate, isPastDeadline, summarizeAvailability } from './calendar.js';
-import { readMeetingDraft, removeLocalMeeting, saveMeetingDraft } from './local-meetings.js';
+import { eventAvailability, formatDateTime, getEventId } from './config.js';
+import { renderDescription } from './content.js';
+import { isEventUnavailableError, submitRegistration, subscribeEventPublic } from './firebase-store.js';
 
-const meetingId = getMeetingId();
+const eventId = getEventId();
 const configError = document.querySelector('#config-error');
 const app = document.querySelector('#respond-app');
-const info = document.querySelector('#meeting-info');
-const form = document.querySelector('#response-form');
-const slotGrid = document.querySelector('#slot-grid');
-const summary = document.querySelector('#selection-summary');
-const status = document.querySelector('#response-status');
+const info = document.querySelector('#event-info');
+const form = document.querySelector('#registration-form');
+const customFieldsContainer = document.querySelector('#custom-answer-fields');
+const status = document.querySelector('#registration-status');
+let eventData;
 
-let meeting;
-let slots = [];
-let selected = new Set();
-let initialized = false;
-
-if (!meetingId) {
+if (!eventId) {
   configError.classList.remove('hidden');
 } else {
   app.classList.remove('hidden');
-  loadMeeting();
+  beginSync();
+  setInterval(renderState, 30000);
 }
 
 form?.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (!meeting || isPastDeadline(meeting.response_deadline)) {
-    status.textContent = '已超過回覆截止時間，無法送出。';
+  const availability = eventAvailability(eventData);
+  if (!availability.open) {
+    status.textContent = availability.label;
+    renderState();
     return;
   }
 
   const data = new FormData(form);
-  const participantName = clean(data.get('participant_name'));
-  const note = clean(data.get('note'));
-  if (!participantName) return;
-  status.textContent = '正在送出回覆...';
-
-  try {
-    await submitResponse(meetingId, participantName, Array.from(selected), note);
-    saveMeetingDraft(meetingId, {
-      participantName, note, availability: Array.from(selected),
-    });
-    status.textContent = `已儲存 ${participantName} 的最新回覆，共 ${selected.size} 個時段。若同名再次送出，會覆蓋這筆資料。`;
-  } catch (error) {
-    status.textContent = error?.message || '送出失敗，請稍後再試。';
-  }
-});
-
-document.querySelectorAll('[data-quick]').forEach((button) => {
-  button.addEventListener('click', () => {
-    const action = button.dataset.quick;
-    if (action === 'all') selected = new Set(slots.map((slot) => slot.key));
-    if (action === 'clear') selected.clear();
-    if (action === 'weekdays') selected = new Set(slots.filter((slot) => {
-      const day = new Date(`${slot.date}T00:00:00`).getDay();
-      return day !== 0 && day !== 6;
-    }).map((slot) => slot.key));
-    renderSlots();
+  const customAnswers = {};
+  customFields().forEach(([fieldId]) => {
+    customAnswers[fieldId] = clean(data.get(`custom_${fieldId}`));
   });
+  const values = {
+    name: clean(data.get('name')),
+    email: clean(data.get('email')),
+    phone: clean(data.get('phone')),
+    custom_answers: customAnswers,
+  };
+
+  status.textContent = '正在送出報名資料...';
+  form.querySelector('button[type="submit"]').disabled = true;
+  try {
+    await submitRegistration(eventId, eventData, values);
+    form.reset();
+    status.textContent = '報名成功！資料已安全送達主辦人。';
+  } catch (error) {
+    status.textContent = String(error?.code).toLowerCase().includes('permission')
+      ? '無法送出：可能已額滿、報名時間已結束，或這個 Email 已報名。'
+      : (error?.message || '送出失敗，請稍後再試。');
+  } finally {
+    renderState();
+  }
 });
 
-async function loadMeeting() {
-  status.textContent = '正在從 Firebase 讀取會議...';
+async function beginSync() {
+  status.textContent = '正在載入活動...';
   try {
-    await subscribeMeetingSettings(meetingId, (settings) => {
-      meeting = settings;
-      slots = buildSlots(meeting);
-      if (!initialized) restoreDraft();
-      initialized = true;
+    await subscribeEventPublic(eventId, (data) => {
+      const firstRender = !eventData;
+      eventData = data;
       renderInfo();
-      renderSlots();
-      status.textContent = '已與 Firebase 同步；填寫不需要管理密鑰。';
-    }, handleMeetingError);
+      if (firstRender) renderCustomFields();
+      renderState();
+    }, handleError);
   } catch (error) {
-    handleMeetingError(error);
+    handleError(error);
   }
-}
-
-function restoreDraft() {
-  const draft = readMeetingDraft(meetingId);
-  if (draft.participantName) form.elements.namedItem('participant_name').value = draft.participantName;
-  if (draft.note) form.elements.namedItem('note').value = draft.note;
-  selected = new Set((draft.availability || []).filter((key) => slots.some((slot) => slot.key === key)));
-}
-
-function handleMeetingError(error) {
-  status.textContent = error?.message || '無法載入會議。';
-  form.querySelector('button[type="submit"]').disabled = true;
-  if (!isMeetingUnavailableError(error)) return;
-
-  removeLocalMeeting(meetingId);
-  meeting = undefined;
-  slots = [];
-  selected.clear();
-  info.innerHTML = '<h1>會議已不存在</h1><p>Firebase 資料已刪除或到期，本機草稿與會議記錄也已清除。</p>';
-  slotGrid.replaceChildren();
-  summary.replaceChildren();
 }
 
 function renderInfo() {
-  info.innerHTML = `
-    <h1>${escapeHtml(meeting.title || '未命名會議')}</h1>
-    <dl>
-      <div><dt>發起人</dt><dd>${escapeHtml(meeting.organizer_name || '未填')}</dd></div>
-      <div><dt>日期</dt><dd>${escapeHtml(meeting.start_date)} 至 ${escapeHtml(meeting.end_date)}</dd></div>
-      <div><dt>截止</dt><dd>${escapeHtml(meeting.response_deadline || '未設定')}</dd></div>
-      <div><dt>資料清除</dt><dd>${new Date(meeting.expires_at).toLocaleString('zh-TW')}</dd></div>
-    </dl>
-    ${meeting.description ? `<p>${escapeHtml(meeting.description)}</p>` : ''}
-  `;
-  form.querySelector('button[type="submit"]').disabled = meeting.status !== 'open'
-    || isPastDeadline(meeting.response_deadline);
+  info.innerHTML = `<div class="section-heading"><p class="eyebrow">Event registration</p><h1>${escapeHtml(eventData.title)}</h1></div><dl><div><dt>主辦人</dt><dd>${escapeHtml(eventData.organizer_name || '未填寫')}</dd></div><div><dt>報名期間</dt><dd>${formatDateTime(eventData.registration_start_at)} 至 ${formatDateTime(eventData.registration_end_at)}</dd></div><div><dt>名額</dt><dd>${eventData.registration_count}/${eventData.capacity}</dd></div><div><dt>資料刪除</dt><dd>${formatDateTime(eventData.expires_at)}</dd></div></dl><div data-description></div><p class="availability-badge" data-availability></p>`;
+  renderDescription(info.querySelector('[data-description]'), eventData.description_content, eventData.description_format);
 }
 
-function renderSlots() {
-  slotGrid.innerHTML = groupSlotsByDate(slots).map((group) => `
-    <section class="day-card">
-      <h3>${group.date} <span>${group.slots[0].weekday}</span></h3>
-      <div class="slot-list">
-        ${group.slots.map((slot) => `<button class="slot-button ${selected.has(slot.key) ? 'selected' : ''}" type="button" data-slot="${slot.key}">${slot.start_time}-${slot.end_time}</button>`).join('')}
-      </div>
-    </section>
-  `).join('');
-  slotGrid.querySelectorAll('[data-slot]').forEach((button) => button.addEventListener('click', () => {
-    const key = button.dataset.slot;
-    if (selected.has(key)) selected.delete(key); else selected.add(key);
-    renderSlots();
-  }));
-  const data = summarizeAvailability(Array.from(selected), slots);
-  summary.innerHTML = `<span>已選日期：${data.dateCount}</span><span>已選時段：${data.slotCount}</span><span>最早：${data.firstSlot || '-'}</span><span>最晚：${data.lastSlot || '-'}</span>`;
+function renderCustomFields() {
+  customFieldsContainer.innerHTML = customFields().map(([fieldId, field]) => `<label><span>${escapeHtml(field.label)}（選填）</span><input name="custom_${fieldId}" maxlength="500" /></label>`).join('');
+}
+
+function renderState() {
+  if (!eventData) return;
+  const availability = eventAvailability(eventData);
+  info.querySelector('[data-availability]').textContent = availability.label;
+  info.querySelector('[data-availability]').className = `availability-badge ${availability.state}`;
+  form.querySelectorAll('input, button[type="submit"]').forEach((control) => { control.disabled = !availability.open; });
+  if (!status.textContent || status.textContent.startsWith('正在載入')) status.textContent = availability.open ? '請填寫資料完成報名。' : availability.label;
+}
+
+function customFields() {
+  return Object.entries(eventData?.custom_fields || {}).sort(([, a], [, b]) => Number(a.order) - Number(b.order));
+}
+
+function handleError(error) {
+  status.textContent = error?.message || '無法載入活動。';
+  form.querySelectorAll('input, button').forEach((control) => { control.disabled = true; });
+  if (isEventUnavailableError(error)) info.innerHTML = '<h1>活動已不存在</h1><p>Firebase 資料已刪除或四週期限已到。</p>';
 }
 
 function clean(value) { return String(value || '').trim(); }

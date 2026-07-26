@@ -1,4 +1,4 @@
-name: Cleanup expired meetings
+name: Cleanup expired events
 
 on:
   schedule:
@@ -18,3 +18,5 @@ jobs:
         with:
           node-version: '22'
       - run: node scripts/cleanup-expired.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}

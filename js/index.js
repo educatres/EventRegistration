@@ -1,112 +1,57 @@
-import { buildMeetingUrl, parseMeetingReference } from './config.js';
-import { getMeeting, getMeetingCatalog, isMeetingUnavailableError } from './firebase-store.js';
-import { clearAllLocalMeetingData, readRecentMeetings, writeRecentMeetings } from './local-meetings.js';
+import { buildEventUrl, parseEventReference } from './config.js';
+import { getEventPublic, isEventUnavailableError } from './firebase-store.js';
+import { clearRecentEvents, readRecentEvents, removeLocalEvent, writeRecentEvents } from './local-events.js';
 
-const openForm = document.querySelector('#open-meeting-form');
-const recentList = document.querySelector('#recent-meetings');
+const openForm = document.querySelector('#open-event-form');
+const recentList = document.querySelector('#recent-events');
 const clearButton = document.querySelector('#clear-recent');
-const debugTrigger = document.querySelector('#debug-trigger');
-const debugDialog = document.querySelector('#debug-dialog');
-const debugClose = document.querySelector('#debug-close');
-const debugRefresh = document.querySelector('#debug-refresh');
-const debugStatus = document.querySelector('#debug-status');
-const debugMeetings = document.querySelector('#debug-meetings');
 
-renderRecentMeetings();
-synchronizeRecentMeetings();
+renderRecentEvents();
+synchronizeRecentEvents();
 
 openForm?.addEventListener('submit', (event) => {
   event.preventDefault();
-  const meetingId = parseMeetingReference(new FormData(openForm).get('meeting_reference'));
-  if (!meetingId) return;
-  window.location.href = buildMeetingUrl('./results.html', meetingId);
+  const eventId = parseEventReference(new FormData(openForm).get('event_reference'));
+  if (!eventId) return;
+  window.location.href = buildEventUrl('./results.html', eventId);
 });
 
 clearButton?.addEventListener('click', () => {
-  clearAllLocalMeetingData();
-  renderRecentMeetings();
+  clearRecentEvents();
+  renderRecentEvents();
 });
 
-debugTrigger?.addEventListener('click', () => {
-  debugDialog.showModal();
-  loadDebugMeetings();
-});
-
-debugClose?.addEventListener('click', () => debugDialog.close());
-debugRefresh?.addEventListener('click', loadDebugMeetings);
-debugDialog?.addEventListener('click', (event) => {
-  if (event.target === debugDialog) debugDialog.close();
-});
-
-async function loadDebugMeetings() {
-  debugStatus.textContent = '正在讀取 Firebase...';
-  debugMeetings.innerHTML = '<tr><td colspan="3" class="muted-text">載入中...</td></tr>';
-
-  try {
-    const now = Date.now();
-    const meetings = (await getMeetingCatalog())
-      .sort((a, b) => (a.expires_at || 0) - (b.expires_at || 0));
-    debugMeetings.innerHTML = meetings.length ? meetings.map((meeting) => {
-      const expired = Number(meeting.expires_at) <= now;
-      const meetingId = meeting.meeting_id || '-';
-      return `
-        <tr>
-          <td><code>${escapeHtml(meetingId)}</code><small>meetings/${escapeHtml(meetingId)}</small></td>
-          <td>${formatDebugTime(meeting.expires_at)}</td>
-          <td><span class="debug-state ${expired ? 'expired' : ''}">${expired ? '已失效，等待清除' : '有效'}</span></td>
-        </tr>`;
-    }).join('') : '<tr><td colspan="3" class="muted-text">Firebase 目前沒有 meeting。</td></tr>';
-    debugStatus.textContent = `共 ${meetings.length} 筆，更新於 ${new Date().toLocaleTimeString('zh-TW')}`;
-  } catch (error) {
-    debugMeetings.innerHTML = '<tr><td colspan="3" class="muted-text">無法讀取 Firebase meeting。</td></tr>';
-    debugStatus.textContent = error?.message || '讀取失敗。';
-  }
-}
-
-async function synchronizeRecentMeetings() {
-  const entries = readRecentMeetings();
-  if (entries.length === 0) return;
-
+async function synchronizeRecentEvents() {
+  const entries = readRecentEvents();
+  if (!entries.length) return;
   const synchronized = await Promise.all(entries.map(async (entry) => {
     try {
-      const record = await getMeeting(entry.meetingId);
-      return {
-        ...entry,
-        title: record.settings?.title || entry.title,
-        expiresAt: record.settings?.expires_at || entry.expiresAt,
-      };
+      const event = await getEventPublic(entry.eventId);
+      return { ...entry, title: event.title, expiresAt: event.expires_at };
     } catch (error) {
-      return isMeetingUnavailableError(error) ? null : entry;
+      if (isEventUnavailableError(error)) {
+        removeLocalEvent(entry.eventId);
+        return null;
+      }
+      return entry;
     }
   }));
-
-  writeRecentMeetings(synchronized.filter(Boolean));
-  renderRecentMeetings();
+  writeRecentEvents(synchronized.filter(Boolean));
+  renderRecentEvents();
 }
 
-function renderRecentMeetings() {
-  const meetings = readRecentMeetings();
-  if (!recentList) return;
-  recentList.innerHTML = meetings.length
-    ? meetings.map((meeting) => `
-      <li>
-        <div>
-          <strong>${escapeHtml(meeting.title || meeting.meetingId)}</strong>
-          <small>${escapeHtml(meeting.meetingId)}</small>
-        </div>
-        <a class="ghost-btn as-link small-btn" href="${buildMeetingUrl('./results.html', meeting.meetingId)}">查看</a>
-      </li>
-    `).join('')
-    : '<li class="empty-text">這個瀏覽器尚未建立任何會議。</li>';
+function renderRecentEvents() {
+  const events = readRecentEvents();
+  recentList.innerHTML = events.length ? events.map((event) => `
+    <li>
+      <div><strong>${escapeHtml(event.title || event.eventId)}</strong><small>${escapeHtml(event.eventId)}</small></div>
+      <a class="ghost-btn as-link small-btn" href="${buildEventUrl('./results.html', event.eventId)}">管理</a>
+    </li>
+  `).join('') : '<li class="empty-text">這個瀏覽器尚未建立任何活動。</li>';
 }
 
 function escapeHtml(value) {
   return String(value || '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
   }[char]));
-}
-
-function formatDebugTime(value) {
-  const timestamp = Number(value);
-  return Number.isFinite(timestamp) ? new Date(timestamp).toLocaleString('zh-TW') : '-';
 }

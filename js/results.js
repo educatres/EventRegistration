@@ -1,177 +1,167 @@
-import { buildMeetingUrl, getMeetingId } from './config.js';
-import { claimAdminKey, isMeetingUnavailableError, subscribeMeeting, updateMeetingSettings } from './firebase-store.js';
-import { buildSlots, formatSlotKey, groupSlotsByDate } from './calendar.js';
-import { buildSlotStatistics, getRecommendedSlots, meetingFromRecord, responsesFromRecord } from './meeting-store.js';
-import { renderQr } from './qr.js';
-import { getLocalAdminKey, removeLocalMeeting } from './local-meetings.js';
+import { eventAvailability, formatDateTime, fromDateTimeLocal, getEventId, toDateTimeLocal } from './config.js';
+import { renderDescription } from './content.js';
+import { claimAdminKey, closeEvent, isEventUnavailableError, subscribeEventPublic, subscribeRegistrations, updateEventSchedule } from './firebase-store.js';
+import { getLocalAdminKey, removeLocalEvent } from './local-events.js';
 
-const meetingId = getMeetingId();
+const eventId = getEventId();
+const app = document.querySelector('#manage-app');
 const configError = document.querySelector('#config-error');
-const app = document.querySelector('#results-app');
-const info = document.querySelector('#result-info');
-const statsGrid = document.querySelector('#stats-grid');
-const participantTable = document.querySelector('#participant-table tbody');
-const recommendations = document.querySelector('#recommendations');
-const finalPanel = document.querySelector('#final-panel');
-const status = document.querySelector('#sync-status');
-const qrCode = document.querySelector('#qr-code');
-const participantLink = document.querySelector('#participant-link');
+const summary = document.querySelector('#event-summary');
+const syncStatus = document.querySelector('#sync-status');
 const adminForm = document.querySelector('#admin-form');
 const adminStatus = document.querySelector('#admin-status');
-
-let meeting;
-let responses = [];
-let statistics = [];
+const adminContent = document.querySelector('#admin-content');
+const scheduleForm = document.querySelector('#schedule-form');
+const table = document.querySelector('#registration-table');
+let eventData;
+let registrations = [];
 let adminUnlocked = false;
+let unsubscribeRegistrations;
 
-if (!meetingId) {
+if (!eventId) {
   configError.classList.remove('hidden');
 } else {
   app.classList.remove('hidden');
   beginSync();
-  restoreLocalAdminKey();
 }
 
 adminForm?.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const key = String(new FormData(adminForm).get('admin_key') || '').trim();
-  adminStatus.textContent = '正在驗證管理密鑰...';
-  try {
-    await claimAdminKey(meetingId, key);
-    adminUnlocked = true;
-    adminStatus.textContent = '管理權限已解鎖；現在可以修改最終時間。';
-    renderStats();
-  } catch {
-    adminUnlocked = false;
-    adminStatus.textContent = '密鑰不正確，請確認六位數字後重試。';
-  }
+  await unlock(String(new FormData(adminForm).get('admin_key') || '').trim());
 });
 
-statsGrid?.addEventListener('click', async (event) => {
-  const button = event.target.closest('[data-final-slot]');
-  if (!button || !adminUnlocked) return;
-  status.textContent = '正在更新最終時間...';
-  try {
-    await updateMeetingSettings(meetingId, {
-      selected_final_slot: button.dataset.finalSlot,
-      status: 'finalized',
-    });
-    status.textContent = '最終時間已更新。';
-  } catch (error) {
-    status.textContent = error?.message || '更新失敗。';
-  }
-});
-
-async function beginSync() {
-  status.textContent = '連線 Firebase...';
-  try {
-    await subscribeMeeting(meetingId, (record) => {
-      meeting = meetingFromRecord(record);
-      responses = responsesFromRecord(record);
-      statistics = buildSlotStatistics(buildSlots(meeting), responses, meeting.selected_final_slot);
-      renderAll();
-      status.textContent = `即時同步：${new Date().toLocaleTimeString('zh-TW')}`;
-    }, (error) => {
-      handleSyncError(error);
-    });
-  } catch (error) {
-    handleSyncError(error);
-  }
-}
-
-async function restoreLocalAdminKey() {
-  try {
-    const key = getLocalAdminKey(meetingId);
-    if (!key) return;
-    adminForm.elements.namedItem('admin_key').value = key;
-    await claimAdminKey(meetingId, key);
-    adminUnlocked = true;
-    adminStatus.textContent = '已使用本瀏覽器保存的密鑰解鎖管理權限。';
-    renderStats();
-  } catch {
-    // 本機記錄可能已過期或被修改，維持唯讀即可。
-  }
-}
-
-function handleSyncError(error) {
-  status.textContent = error?.message || '同步失敗。';
-  if (!isMeetingUnavailableError(error)) return;
-
-  removeLocalMeeting(meetingId);
-  meeting = undefined;
-  responses = [];
-  statistics = [];
-  adminUnlocked = false;
-  info.innerHTML = '<h1>會議已不存在</h1><p>Firebase 資料已刪除或到期，本機會議記錄與草稿也已清除。</p>';
-  statsGrid.replaceChildren();
-  participantTable.replaceChildren();
-  recommendations.replaceChildren();
-  finalPanel.innerHTML = '<p class="empty-text">沒有可顯示的 Firebase 資料。</p>';
-  participantLink.value = '';
-  qrCode.replaceChildren();
-  adminForm.elements.namedItem('admin_key').value = '';
-  adminForm.querySelector('button[type="submit"]').disabled = true;
-  adminStatus.textContent = 'Firebase 會議已不存在，管理功能已停用。';
-}
-
-function renderAll() {
-  const respondUrl = buildMeetingUrl('./respond.html', meetingId);
-  participantLink.value = respondUrl;
-  renderQr(qrCode, respondUrl);
-  info.innerHTML = `
-    <h1>${escapeHtml(meeting.title || '未命名會議')}</h1>
-    <dl>
-      <div><dt>會議 ID</dt><dd>${escapeHtml(meetingId)}</dd></div>
-      <div><dt>日期</dt><dd>${escapeHtml(meeting.start_date)} 至 ${escapeHtml(meeting.end_date)}</dd></div>
-      <div><dt>回覆人數</dt><dd>${responses.length}</dd></div>
-      <div><dt>自動清除</dt><dd>${new Date(meeting.expires_at).toLocaleString('zh-TW')}</dd></div>
-    </dl>`;
-  renderStats();
-  participantTable.innerHTML = responses.map((response) => `
-    <tr><td>${escapeHtml(response.participant_name)}</td><td>${response.availability.length}</td><td>${formatTimestamp(response.submitted_at)}</td><td>${escapeHtml(response.note)}</td></tr>
-  `).join('');
-  recommendations.innerHTML = getRecommendedSlots(statistics, 3).map((slot, index) => `
-    <li><strong>推薦 ${index + 1}</strong><span>${escapeHtml(formatSlotKey(slot.slot_key, meeting.slot_minutes))}</span><em>${slot.available_count}/${slot.total_participants} 人可參加</em></li>
-  `).join('');
-  renderFinal();
-}
-
-function renderStats() {
-  if (!meeting) return;
-  statsGrid.innerHTML = groupSlotsByDate(statistics).map((group) => `
-    <section class="day-card">
-      <h3>${group.date} <span>${group.slots[0].weekday}</span></h3>
-      <div class="slot-list vertical">${group.slots.map(renderStatSlot).join('')}</div>
-    </section>
-  `).join('');
-}
-
-function renderStatSlot(slot) {
-  const names = slot.participant_names.length ? slot.participant_names.join('、') : '無';
-  const intensity = slot.total_participants === 0 ? 0 : slot.available_count / slot.total_participants;
-  return `
-    <article class="stat-slot ${slot.is_all_available ? 'all-available' : ''} ${slot.is_final_slot ? 'final' : ''}" style="--heat:${intensity.toFixed(2)}">
-      <div><strong>${slot.start_time}-${slot.end_time}</strong><span>${slot.available_count}/${slot.total_participants} 人，${slot.available_rate}%</span><small>${escapeHtml(names)}</small></div>
-      <button class="ghost-btn small-btn" type="button" data-final-slot="${slot.slot_key}" ${adminUnlocked ? '' : 'disabled'}>${slot.is_final_slot ? '已定案' : '設為最終'}</button>
-    </article>`;
-}
-
-function renderFinal() {
-  if (!meeting.selected_final_slot) {
-    finalPanel.innerHTML = '<p class="empty-text">尚未設定最終會議時間。</p>';
+scheduleForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const data = new FormData(scheduleForm);
+  const startAt = fromDateTimeLocal(data.get('registration_start_at'));
+  const endAt = fromDateTimeLocal(data.get('registration_end_at'));
+  const scheduleStatus = document.querySelector('#schedule-status');
+  if (startAt >= endAt) {
+    scheduleStatus.textContent = '結束時間必須晚於開始時間。';
     return;
   }
-  const slot = statistics.find((item) => item.slot_key === meeting.selected_final_slot);
-  const unavailable = responses.filter((response) => !response.availability.includes(meeting.selected_final_slot)).map((response) => response.participant_name);
-  finalPanel.innerHTML = `
-    <h3>${escapeHtml(formatSlotKey(meeting.selected_final_slot, meeting.slot_minutes))}</h3>
-    <p>${slot?.available_count || 0}/${responses.length} 人可參加</p>
-    <textarea readonly rows="3">會議時間已確定為 ${formatSlotKey(meeting.selected_final_slot, meeting.slot_minutes)}。</textarea>
-    <p class="muted-text">無法參加：${escapeHtml(unavailable.join('、') || '無')}</p>`;
+  if (endAt > Number(eventData.expires_at)) {
+    scheduleStatus.textContent = '結束時間不可晚於四週資料刪除時間。';
+    return;
+  }
+  scheduleStatus.textContent = '正在儲存...';
+  try {
+    await updateEventSchedule(eventId, startAt, endAt);
+    scheduleStatus.textContent = '報名起訖時間已更新。';
+  } catch (error) {
+    scheduleStatus.textContent = error?.message || '儲存失敗。';
+  }
+});
+
+document.querySelector('#close-registration')?.addEventListener('click', async () => {
+  if (!window.confirm('確定關閉報名？關閉後不可重新開啟。')) return;
+  const closeStatus = document.querySelector('#close-status');
+  closeStatus.textContent = '正在關閉...';
+  try {
+    await closeEvent(eventId);
+    closeStatus.textContent = '報名已關閉，既有資料仍可下載。';
+  } catch (error) {
+    closeStatus.textContent = error?.message || '關閉失敗。';
+  }
+});
+
+document.querySelector('#download-csv')?.addEventListener('click', downloadCsv);
+
+async function beginSync() {
+  try {
+    await subscribeEventPublic(eventId, (data) => {
+      eventData = data;
+      renderSummary();
+      fillScheduleForm();
+      syncStatus.textContent = `已同步 ${new Date().toLocaleTimeString('zh-TW')}`;
+      if (!adminUnlocked) restoreLocalKey();
+    }, handleError);
+  } catch (error) {
+    handleError(error);
+  }
 }
 
-function formatTimestamp(value) {
-  return value ? new Date(value).toLocaleString('zh-TW') : '-';
+async function restoreLocalKey() {
+  const key = getLocalAdminKey(eventId);
+  if (!key) return;
+  adminForm.elements.namedItem('admin_key').value = key;
+  await unlock(key, true);
+}
+
+async function unlock(key, restored = false) {
+  adminStatus.textContent = '正在驗證管理密鑰...';
+  adminForm.querySelector('button').disabled = true;
+  try {
+    await claimAdminKey(eventId, key);
+    adminUnlocked = true;
+    adminContent.classList.remove('hidden');
+    adminStatus.textContent = restored ? '已使用本瀏覽器保存的密鑰解鎖。' : '管理權限已解鎖。';
+    unsubscribeRegistrations?.();
+    unsubscribeRegistrations = await subscribeRegistrations(eventId, (data) => {
+      registrations = data;
+      renderTable();
+    }, (error) => { adminStatus.textContent = error?.message || '無法載入報名資料。'; });
+  } catch {
+    adminUnlocked = false;
+    adminContent.classList.add('hidden');
+    adminStatus.textContent = '密鑰不正確，請確認六位數字後重試。';
+  } finally {
+    adminForm.querySelector('button').disabled = false;
+  }
+}
+
+function renderSummary() {
+  const availability = eventAvailability(eventData);
+  summary.innerHTML = `<div class="section-heading"><p class="eyebrow">${escapeHtml(eventId)}</p><h2>${escapeHtml(eventData.title)}</h2></div><dl><div><dt>主辦人</dt><dd>${escapeHtml(eventData.organizer_name || '未填寫')}</dd></div><div><dt>報名狀態</dt><dd><span class="availability-badge ${availability.state}">${availability.label}</span></dd></div><div><dt>目前人數</dt><dd>${eventData.registration_count}/${eventData.capacity}</dd></div><div><dt>報名期間</dt><dd>${formatDateTime(eventData.registration_start_at)} 至 ${formatDateTime(eventData.registration_end_at)}</dd></div><div><dt>自動刪除</dt><dd>${formatDateTime(eventData.expires_at)}</dd></div></dl><div data-description></div>`;
+  renderDescription(summary.querySelector('[data-description]'), eventData.description_content, eventData.description_format);
+  const closeButton = document.querySelector('#close-registration');
+  if (closeButton) closeButton.disabled = eventData.status === 'closed';
+}
+
+function fillScheduleForm() {
+  if (!eventData || document.activeElement?.closest('#schedule-form')) return;
+  scheduleForm.elements.namedItem('registration_start_at').value = toDateTimeLocal(eventData.registration_start_at);
+  scheduleForm.elements.namedItem('registration_end_at').value = toDateTimeLocal(eventData.registration_end_at);
+}
+
+function renderTable() {
+  const fields = customFields();
+  table.querySelector('thead').innerHTML = `<tr><th>報名時間</th><th>姓名</th><th>Email</th><th>電話</th>${fields.map(([, field]) => `<th>${escapeHtml(field.label)}</th>`).join('')}</tr>`;
+  table.querySelector('tbody').innerHTML = registrations.length ? registrations.map((registration) => `<tr><td>${formatDateTime(registration.submitted_at)}</td><td>${escapeHtml(registration.name)}</td><td>${escapeHtml(registration.email)}</td><td>${escapeHtml(registration.phone)}</td>${fields.map(([fieldId]) => `<td>${escapeHtml(registration.custom_answers?.[fieldId] || '')}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${4 + fields.length}" class="empty-text">目前沒有報名資料。</td></tr>`;
+  document.querySelector('#registration-count').textContent = `共 ${registrations.length} 筆，名額上限 ${eventData.capacity} 人。`;
+}
+
+function downloadCsv() {
+  const fields = customFields();
+  const rows = [
+    ['報名時間', '姓名', 'Email', '電話', ...fields.map(([, field]) => field.label)],
+    ...registrations.map((registration) => [formatDateTime(registration.submitted_at), registration.name, registration.email, registration.phone, ...fields.map(([fieldId]) => registration.custom_answers?.[fieldId] || '')]),
+  ];
+  const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}`;
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${safeFilename(eventData.title)}-registrations.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function csvCell(value) {
+  let text = String(value ?? '');
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function safeFilename(value) { return String(value || 'event').replace(/[\\/:*?"<>|]/g, '-').slice(0, 80); }
+function customFields() { return Object.entries(eventData?.custom_fields || {}).sort(([, a], [, b]) => Number(a.order) - Number(b.order)); }
+
+function handleError(error) {
+  syncStatus.textContent = error?.message || '同步失敗';
+  if (!isEventUnavailableError(error)) return;
+  removeLocalEvent(eventId);
+  summary.innerHTML = '<h2>活動已不存在</h2><p>Firebase 資料已刪除或四週期限已到。</p>';
+  adminForm.querySelector('button').disabled = true;
+  adminContent.classList.add('hidden');
 }
 
 function escapeHtml(value) {

@@ -1,7 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import { get, getDatabase, onValue, ref, set, update } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
-import { MEETING_LIFETIME_MS, participantNameKey } from './config.js';
+import { emailKey, EVENT_LIFETIME_MS, normalizeEmail } from './config.js';
 import { firebaseConfig } from './firebase-config.js';
 
 const app = initializeApp(firebaseConfig);
@@ -20,160 +20,138 @@ export function ensureAuth() {
         resolve(user);
         return;
       }
-
       try {
         const credential = await signInAnonymously(auth);
         unsubscribe();
         resolve(credential.user);
       } catch (error) {
         unsubscribe();
+        authPromise = undefined;
         reject(error);
       }
     }, reject);
   });
-
   return authPromise;
 }
 
-export async function createMeeting(meetingId, adminKey, meeting) {
+export async function createEvent(eventId, adminKey, values) {
   const user = await ensureAuth();
   const createdAt = Date.now();
-  const expiresAt = createdAt + MEETING_LIFETIME_MS;
-  const settings = {
-    title: meeting.meeting_title,
-    description: meeting.meeting_description,
-    organizer_name: meeting.organizer_name,
-    start_date: meeting.start_date,
-    end_date: meeting.end_date,
-    start_time: meeting.start_time,
-    end_time: meeting.end_time,
-    slot_minutes: Number(meeting.slot_minutes),
-    include_saturday: meeting.include_saturday,
-    include_sunday: meeting.include_sunday,
-    response_deadline: meeting.response_deadline,
+  const expiresAt = createdAt + EVENT_LIFETIME_MS;
+  if (values.registration_end_at > expiresAt) throw new Error('報名結束時間不可晚於資料自動刪除時間。');
+
+  const publicData = {
+    title: values.title,
+    organizer_name: values.organizer_name,
+    description_content: values.description_content,
+    description_format: values.description_format,
+    registration_start_at: values.registration_start_at,
+    registration_end_at: values.registration_end_at,
+    capacity: values.capacity,
+    registration_count: 0,
+    custom_fields: values.custom_fields,
     status: 'open',
-    selected_final_slot: '',
     created_at: createdAt,
     expires_at: expiresAt,
     created_by: user.uid,
   };
 
-  await set(ref(database, `adminKeys/${meetingId}`), adminKey);
-  await set(ref(database, `adminKeyClaims/${meetingId}/${user.uid}`), adminKey);
-  await set(ref(database, `meetings/${meetingId}/settings`), settings);
-  await set(ref(database, `meetingCatalog/${meetingId}`), {
-    meeting_id: meetingId,
-    created_at: createdAt,
-    expires_at: expiresAt,
-  });
-
-  return { ...settings, meeting_id: meetingId };
+  try {
+    await set(ref(database, `adminKeys/${eventId}`), adminKey);
+    await set(ref(database, `adminKeyClaims/${eventId}/${user.uid}`), adminKey);
+    await set(ref(database, `events/${eventId}/public`), publicData);
+    await set(ref(database, `eventCatalog/${eventId}`), {
+      event_id: eventId,
+      created_at: createdAt,
+      expires_at: expiresAt,
+    });
+  } catch (error) {
+    try {
+      await update(ref(database), {
+        [`events/${eventId}`]: null,
+        [`adminKeys/${eventId}`]: null,
+        [`adminKeyClaims/${eventId}`]: null,
+        [`eventCatalog/${eventId}`]: null,
+      });
+    } catch {
+      // 保留原始錯誤；殘留資料會由到期清除工作移除。
+    }
+    throw error;
+  }
+  return { event_id: eventId, ...publicData };
 }
 
-export async function getMeeting(meetingId) {
+export async function getEventPublic(eventId) {
   await ensureAuth();
-  const snapshot = await get(ref(database, `meetings/${meetingId}`));
-  if (!snapshot.exists()) throw createMeetingUnavailableError();
-  return { meeting_id: meetingId, ...snapshot.val() };
+  const snapshot = await get(ref(database, `events/${eventId}/public`));
+  if (!snapshot.exists()) throw createEventUnavailableError();
+  return { event_id: eventId, ...snapshot.val() };
 }
 
-export async function getMeetingCatalog() {
+export async function subscribeEventPublic(eventId, onData, onError) {
   await ensureAuth();
-  const snapshot = await get(ref(database, 'meetingCatalog'));
-  if (!snapshot.exists()) return [];
-  return Object.entries(snapshot.val()).map(([meetingId, entry]) => ({
-    ...entry,
-    meeting_id: entry.meeting_id || meetingId,
-  }));
-}
-
-export async function subscribeMeeting(meetingId, onData, onError) {
-  await ensureAuth();
-  return onValue(ref(database, `meetings/${meetingId}`), (snapshot) => {
+  return onValue(ref(database, `events/${eventId}/public`), (snapshot) => {
     if (!snapshot.exists()) {
-      onError?.(createMeetingUnavailableError());
+      onError?.(createEventUnavailableError());
       return;
     }
-    onData({ meeting_id: meetingId, ...snapshot.val() });
+    onData({ event_id: eventId, ...snapshot.val() });
   }, onError);
 }
 
-export async function subscribeMeetingSettings(meetingId, onData, onError) {
-  await ensureAuth();
-  return onValue(ref(database, `meetings/${meetingId}/settings`), (snapshot) => {
-    if (!snapshot.exists()) {
-      onError?.(createMeetingUnavailableError());
-      return;
-    }
-    onData({ meeting_id: meetingId, ...snapshot.val() });
-  }, onError);
-}
-
-export function isMeetingUnavailableError(error) {
-  const code = String(error?.code || '').toLowerCase();
-  const message = String(error?.message || '').toLowerCase();
-  return code === 'meeting_not_found'
-    || code.includes('permission_denied')
-    || code.includes('permission-denied')
-    || message.includes('permission denied');
-}
-
-export async function submitResponse(meetingId, participantName, availability, note) {
+export async function submitRegistration(eventId, eventData, values) {
   const user = await ensureAuth();
-  const nameKey = await participantNameKey(participantName);
-  await set(ref(database, `meetings/${meetingId}/responses/${nameKey}`), {
-    participant_name: participantName.trim(),
-    name_key: nameKey,
-    availability: {
-      _placeholder: false,
-      ...Object.fromEntries([...new Set(availability)].sort().map((slot) => [slot, true])),
+  const registrationId = await emailKey(values.email);
+  const count = Number(eventData.registration_count || 0);
+  await update(ref(database), {
+    [`events/${eventId}/public/registration_count`]: count + 1,
+    [`events/${eventId}/registrations/${registrationId}`]: {
+      name: values.name,
+      email: normalizeEmail(values.email),
+      phone: values.phone,
+      custom_answers: { _placeholder: '', ...values.custom_answers },
+      submitted_at: Date.now(),
+      submitted_by: user.uid,
     },
-    note: note.trim(),
-    updated_at: Date.now(),
-    updated_by: user.uid,
   });
 }
 
-export async function claimAdminKey(meetingId, adminKey) {
+export async function claimAdminKey(eventId, adminKey) {
   const user = await ensureAuth();
   const key = String(adminKey || '').trim();
   if (!/^\d{6}$/.test(key)) throw new Error('密鑰必須是六位數字。');
-  await set(ref(database, `adminKeyClaims/${meetingId}/${user.uid}`), key);
-  return true;
+  await set(ref(database, `adminKeyClaims/${eventId}/${user.uid}`), key);
 }
 
-export async function updateMeetingSettings(meetingId, values) {
+export async function subscribeRegistrations(eventId, onData, onError) {
   await ensureAuth();
-  await update(ref(database, `meetings/${meetingId}/settings`), values);
+  return onValue(ref(database, `events/${eventId}/registrations`), (snapshot) => {
+    onData(Object.values(snapshot.val() || {}).sort((a, b) => (a.submitted_at || 0) - (b.submitted_at || 0)));
+  }, onError);
 }
 
-export async function deleteExpiredMeeting(meetingId) {
+export async function updateEventSchedule(eventId, startAt, endAt) {
   await ensureAuth();
-  const catalogSnapshot = await get(ref(database, `meetingCatalog/${meetingId}`));
-  const expiresAt = catalogSnapshot.val()?.expires_at;
-  if (!expiresAt || expiresAt > Date.now()) return false;
-
-  await update(ref(database), {
-    [`meetings/${meetingId}`]: null,
-    [`adminKeys/${meetingId}`]: null,
-    [`adminKeyClaims/${meetingId}`]: null,
-    [`meetingCatalog/${meetingId}`]: null,
-  });
-  return true;
-}
-
-export async function deleteMeeting(meetingId) {
-  await ensureAuth();
-  await update(ref(database), {
-    [`meetings/${meetingId}`]: null,
-    [`adminKeys/${meetingId}`]: null,
-    [`adminKeyClaims/${meetingId}`]: null,
-    [`meetingCatalog/${meetingId}`]: null,
+  await update(ref(database, `events/${eventId}/public`), {
+    registration_start_at: startAt,
+    registration_end_at: endAt,
   });
 }
 
-function createMeetingUnavailableError() {
-  const error = new Error('找不到這個會議，或資料已在三週到期後清除。');
-  error.code = 'MEETING_NOT_FOUND';
+export async function closeEvent(eventId) {
+  await ensureAuth();
+  await update(ref(database, `events/${eventId}/public`), { status: 'closed' });
+}
+
+export function isEventUnavailableError(error) {
+  const code = String(error?.code || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  return code === 'event_not_found' || code.includes('permission_denied')
+    || code.includes('permission-denied') || message.includes('permission denied');
+}
+
+function createEventUnavailableError() {
+  const error = new Error('找不到這個活動，或資料已在四週到期後清除。');
+  error.code = 'EVENT_NOT_FOUND';
   return error;
 }

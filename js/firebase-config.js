@@ -1,9 +1,9 @@
 export const firebaseConfig = {
-  apiKey: 'AIzaSyA9RSw733qK-ffR1XZ9Y6JQkkjAjTaTTYo',
-  authDomain: 'schedule-a-meeting-tw.firebaseapp.com',
-  databaseURL: 'https://schedule-a-meeting-tw-default-rtdb.asia-southeast1.firebasedatabase.app',
-  projectId: 'schedule-a-meeting-tw',
-  storageBucket: 'schedule-a-meeting-tw.firebasestorage.app',
-  messagingSenderId: '726957499799',
-  appId: '1:726957499799:web:5140473184516f2499d0d2',
+  projectId: 'eventregistration-tw',
+  appId: '1:466139261244:web:e3ca3240beb60a5c5b5639',
+  databaseURL: 'https://eventregistration-tw-default-rtdb.asia-southeast1.firebasedatabase.app',
+  storageBucket: 'eventregistration-tw.firebasestorage.app',
+  apiKey: 'AIzaSyBQXcwrPnd0ahmcm49ritEgsGm_AKDdP8k',
+  authDomain: 'eventregistration-tw.firebaseapp.com',
+  messagingSenderId: '466139261244',
 };

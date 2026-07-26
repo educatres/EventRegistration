@@ -1,18 +1,13 @@
-import { buildMeetingUrl, generateAdminKey, generateMeetingId } from './config.js';
-import { createMeeting, ensureAuth } from './firebase-store.js';
-import { saveRecentMeeting } from './local-meetings.js';
-import { buildSlots, groupSlotsByDate } from './calendar.js';
+import { buildEventUrl, formatDateTime, fromDateTimeLocal, generateAdminKey, generateEventId, generateFieldId, toDateTimeLocal } from './config.js';
+import { renderDescription } from './content.js';
+import { createEvent, ensureAuth } from './firebase-store.js';
+import { saveRecentEvent } from './local-events.js';
 import { renderQr } from './qr.js';
 
-const form = document.querySelector('#meeting-form');
-const preview = document.querySelector('#slot-preview');
+const form = document.querySelector('#event-form');
+const fieldList = document.querySelector('#custom-field-list');
+const preview = document.querySelector('#event-preview');
 const resultPanel = document.querySelector('#created-panel');
-const respondLink = document.querySelector('#respond-link');
-const resultsLink = document.querySelector('#results-link');
-const meetingIdOutput = document.querySelector('#meeting-id-output');
-const adminKeyOutput = document.querySelector('#admin-key-output');
-const expiryOutput = document.querySelector('#expiry-output');
-const qrCode = document.querySelector('#qr-code');
 const createStatus = document.querySelector('#create-status');
 
 initialize();
@@ -29,33 +24,57 @@ async function initialize() {
 
 form?.addEventListener('input', renderPreview);
 form?.addEventListener('reset', () => setTimeout(() => {
+  fieldList.replaceChildren();
   setDefaults();
   renderPreview();
 }, 0));
 
+document.querySelector('#add-field')?.addEventListener('click', () => {
+  if (fieldList.children.length >= 20) {
+    createStatus.textContent = '自訂欄位最多 20 個。';
+    return;
+  }
+  addFieldRow();
+});
+
+fieldList?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-remove-field]');
+  if (!button) return;
+  button.closest('[data-field-row]')?.remove();
+  renderPreview();
+});
+
 form?.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const meetingId = generateMeetingId();
+  const values = readForm();
+  if (values.registration_start_at >= values.registration_end_at) {
+    createStatus.textContent = '報名結束時間必須晚於開始時間。';
+    return;
+  }
+
+  const eventId = generateEventId();
   const adminKey = generateAdminKey();
-  const meeting = readMeetingForm();
-  createStatus.textContent = '正在 Firebase 建立調查...';
+  createStatus.textContent = '正在 Firebase 建立報名表單...';
+  form.querySelector('button[type="submit"]').disabled = true;
 
   try {
-    const created = await createMeeting(meetingId, adminKey, meeting);
-    const respondUrl = buildMeetingUrl('./respond.html', meetingId);
-    const resultsUrl = buildMeetingUrl('./results.html', meetingId);
-    meetingIdOutput.value = meetingId;
-    adminKeyOutput.value = adminKey;
-    expiryOutput.value = new Date(created.expires_at).toLocaleString('zh-TW');
-    respondLink.value = respondUrl;
-    resultsLink.value = resultsUrl;
-    renderQr(qrCode, respondUrl);
+    const created = await createEvent(eventId, adminKey, values);
+    const respondUrl = buildEventUrl('./respond.html', eventId);
+    const manageUrl = buildEventUrl('./results.html', eventId);
+    document.querySelector('#event-id-output').value = eventId;
+    document.querySelector('#admin-key-output').value = adminKey;
+    document.querySelector('#expiry-output').value = formatDateTime(created.expires_at);
+    document.querySelector('#respond-link').value = respondUrl;
+    document.querySelector('#manage-link').value = manageUrl;
+    renderQr(document.querySelector('#qr-code'), respondUrl);
+    saveRecentEvent({ eventId, title: values.title, adminKey, expiresAt: created.expires_at });
     resultPanel.classList.remove('hidden');
-    saveRecentMeeting({ meetingId, title: meeting.meeting_title, adminKey, expiresAt: created.expires_at });
-    createStatus.textContent = '調查已建立並開始即時同步。請另外保存六位數管理密鑰。';
+    createStatus.textContent = '表單已建立。請妥善保存管理連結與六位數密鑰。';
     resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (error) {
     createStatus.textContent = firebaseErrorMessage(error, '建立失敗，請稍後再試。');
+  } finally {
+    form.querySelector('button[type="submit"]').disabled = false;
   }
 });
 
@@ -69,46 +88,56 @@ document.querySelectorAll('[data-copy-target]').forEach((button) => {
 });
 
 function setDefaults() {
-  form.elements.namedItem('start_time').value = '10:00';
-  form.elements.namedItem('end_time').value = '17:00';
-  form.elements.namedItem('slot_minutes').value = '60';
+  const now = Date.now();
+  const rounded = Math.ceil(now / 1800000) * 1800000;
+  form.elements.namedItem('registration_start_at').value = toDateTimeLocal(rounded);
+  form.elements.namedItem('registration_end_at').value = toDateTimeLocal(rounded + 7 * 24 * 60 * 60 * 1000);
+  form.elements.namedItem('capacity').value = '50';
+}
+
+function addFieldRow(value = '') {
+  const row = document.createElement('div');
+  row.className = 'custom-field-row';
+  row.dataset.fieldRow = '';
+  row.innerHTML = `<label><span>欄位名稱</span><input data-field-label maxlength="60" value="${escapeHtml(value)}" placeholder="例如：飲食需求" /></label><button class="ghost-btn small-btn" type="button" data-remove-field>移除</button>`;
+  fieldList.append(row);
+  row.querySelector('input').focus();
+}
+
+function readForm() {
+  const data = new FormData(form);
+  const customFields = {};
+  [...fieldList.querySelectorAll('[data-field-label]')].map((input) => clean(input.value)).filter(Boolean).forEach((label, order) => {
+    customFields[generateFieldId()] = { label, order };
+  });
+  return {
+    title: clean(data.get('event_title')),
+    organizer_name: clean(data.get('organizer_name')),
+    description_content: clean(data.get('description_content')),
+    description_format: data.get('description_format') === 'html' ? 'html' : 'text',
+    registration_start_at: fromDateTimeLocal(data.get('registration_start_at')),
+    registration_end_at: fromDateTimeLocal(data.get('registration_end_at')),
+    capacity: Number(data.get('capacity')),
+    custom_fields: customFields,
+  };
 }
 
 function renderPreview() {
-  const groups = groupSlotsByDate(buildSlots(readMeetingForm()));
-  preview.innerHTML = groups.length ? groups.map((group) => `
-    <article class="day-card">
-      <h3>${group.date} <span>${group.slots[0].weekday}</span></h3>
-      <div class="slot-list">
-        ${group.slots.map((slot) => `<span class="slot-chip">${slot.start_time}-${slot.end_time}</span>`).join('')}
-      </div>
-    </article>
-  `).join('') : '<p class="empty-text">請選擇有效日期區間。</p>';
-}
-
-function readMeetingForm() {
   const data = new FormData(form);
-  return {
-    meeting_title: clean(data.get('meeting_title')),
-    meeting_description: clean(data.get('meeting_description')),
-    organizer_name: clean(data.get('organizer_name')),
-    start_date: clean(data.get('start_date')),
-    end_date: clean(data.get('end_date')),
-    start_time: clean(data.get('start_time')) || '10:00',
-    end_time: clean(data.get('end_time')) || '17:00',
-    slot_minutes: clean(data.get('slot_minutes')) || '60',
-    include_saturday: data.get('include_saturday') === 'on',
-    include_sunday: data.get('include_sunday') === 'on',
-    response_deadline: clean(data.get('response_deadline')),
-  };
+  const title = clean(data.get('event_title')) || '活動名稱';
+  const organizer = clean(data.get('organizer_name')) || '未填寫';
+  const labels = [...fieldList.querySelectorAll('[data-field-label]')].map((input) => clean(input.value)).filter(Boolean);
+  preview.innerHTML = `<h2>${escapeHtml(title)}</h2><dl><div><dt>主辦人</dt><dd>${escapeHtml(organizer)}</dd></div><div><dt>人數上限</dt><dd>${escapeHtml(data.get('capacity') || '50')} 人</dd></div></dl><div data-description></div><h3>報名欄位</h3><ul class="field-list"><li>姓名（必填）</li><li>Email（必填）</li><li>電話（選填）</li>${labels.map((label) => `<li>${escapeHtml(label)}（選填）</li>`).join('')}</ul>`;
+  renderDescription(preview.querySelector('[data-description]'), clean(data.get('description_content')), data.get('description_format'));
 }
 
 function firebaseErrorMessage(error, fallback) {
   if (error?.code === 'auth/admin-restricted-operation') return 'Firebase 匿名驗證尚未啟用。';
-  if (error?.code === 'PERMISSION_DENIED') return 'Firebase 安全規則拒絕了這次操作。';
+  if (String(error?.code).toLowerCase().includes('permission')) return 'Firebase 安全規則拒絕了這次操作。';
   return error?.message || fallback;
 }
 
-function clean(value) {
-  return String(value || '').trim();
+function clean(value) { return String(value || '').trim(); }
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
 }

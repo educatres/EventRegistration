@@ -3,68 +3,68 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>建立會議調查</title>
+    <title>建立活動報名表單｜EventRegistration</title>
     <link rel="stylesheet" href="./css/styles.css" />
   </head>
   <body>
     <main id="create-app" class="shell">
       <header class="page-header">
-        <div>
-          <p class="eyebrow">建立調查</p>
-          <h1>候選時間設定</h1>
-        </div>
+        <div><p class="eyebrow">建立活動</p><h1>報名表單設定</h1></div>
         <a class="ghost-btn as-link" href="./index.html">回首頁</a>
       </header>
 
       <div class="layout-grid">
-        <form id="meeting-form" class="panel">
-          <label><span>會議名稱 <b>*</b></span><input name="meeting_title" required /></label>
-          <label><span>會議說明</span><textarea name="meeting_description" rows="3"></textarea></label>
-          <label><span>發起人</span><input name="organizer_name" /></label>
+        <form id="event-form" class="panel">
+          <label><span>活動名稱 <b>*</b></span><input name="event_title" maxlength="200" required /></label>
+          <label><span>主辦人名稱</span><input name="organizer_name" maxlength="100" /></label>
+          <div class="two-col description-controls">
+            <label><span>說明格式</span><select name="description_format"><option value="text">純文字</option><option value="html">HTML（安全標籤）</option></select></label>
+            <p class="muted-text">HTML 支援標題、段落、清單、粗斜體與連結；危險標籤會被移除。</p>
+          </div>
+          <label><span>活動說明</span><textarea name="description_content" rows="7" maxlength="10000"></textarea></label>
+
           <div class="two-col">
-            <label><span>開始日期 <b>*</b></span><input name="start_date" type="date" required /></label>
-            <label><span>結束日期 <b>*</b></span><input name="end_date" type="date" required /></label>
+            <label><span>報名開始 <b>*</b></span><input name="registration_start_at" type="datetime-local" required /></label>
+            <label><span>報名結束 <b>*</b></span><input name="registration_end_at" type="datetime-local" required /></label>
           </div>
-          <div class="three-col">
-            <label><span>開始時間</span><input name="start_time" type="time" step="3600" /></label>
-            <label><span>結束時間</span><input name="end_time" type="time" step="3600" /></label>
-            <label><span>間隔分鐘</span><input name="slot_minutes" type="number" min="60" step="60" readonly /></label>
-          </div>
-          <div class="check-row">
-            <label><input name="include_saturday" type="checkbox" /> <span>包含星期六</span></label>
-            <label><input name="include_sunday" type="checkbox" /> <span>包含星期日</span></label>
-          </div>
-          <label><span>回覆截止時間</span><input name="response_deadline" type="datetime-local" /></label>
+          <label><span>人數上限 <b>*</b></span><input name="capacity" type="number" min="1" max="5000" value="50" required /></label>
+
+          <section class="form-section">
+            <div class="section-heading inline-heading">
+              <div><p class="eyebrow">Custom fields</p><h2>自訂欄位</h2></div>
+              <button id="add-field" class="ghost-btn small-btn" type="button">新增欄位</button>
+            </div>
+            <p class="muted-text">姓名與 Email 固定必填，電話固定選填；這裡可再加入最多 20 個選填文字欄位。</p>
+            <div id="custom-field-list" class="custom-field-list"></div>
+          </section>
+
           <div class="actions">
-            <button class="primary-btn" type="submit">建立調查</button>
+            <button class="primary-btn" type="submit">建立報名表單</button>
             <button class="ghost-btn" type="reset">清除設定</button>
           </div>
           <p id="create-status" class="status-line" aria-live="polite"></p>
         </form>
 
-        <aside class="panel">
-          <div class="section-heading">
-            <p class="eyebrow">預覽</p>
-            <h2>候選時段</h2>
-          </div>
-          <div id="slot-preview" class="calendar-grid"></div>
+        <aside class="panel sticky-panel">
+          <div class="section-heading"><p class="eyebrow">預覽</p><h2>參加者看到的內容</h2></div>
+          <div id="event-preview" class="event-preview"></div>
         </aside>
       </div>
 
       <section id="created-panel" class="panel result-panel hidden">
         <div class="result-layout">
           <div>
-            <label><span>meeting_id</span><input id="meeting-id-output" readonly /></label>
-            <label><span>六位數管理密鑰（不在連結中）</span><input id="admin-key-output" class="secret-output" readonly /></label>
-            <label><span>Firebase 自動清除時間</span><input id="expiry-output" readonly /></label>
-            <label><span>參加者連結</span><textarea id="respond-link" rows="3" readonly></textarea></label>
-            <label><span>結果頁連結</span><textarea id="results-link" rows="3" readonly></textarea></label>
+            <div class="section-heading"><p class="eyebrow">建立完成</p><h2>請分開保存連結與密鑰</h2></div>
+            <label><span>活動 ID</span><input id="event-id-output" readonly /></label>
+            <label><span>六位數管理密鑰</span><input id="admin-key-output" class="secret-output" readonly /></label>
+            <label><span>資料自動刪除時間</span><input id="expiry-output" readonly /></label>
+            <label><span>參加者匿名連結</span><textarea id="respond-link" rows="3" readonly></textarea></label>
+            <label><span>主辦人管理連結</span><textarea id="manage-link" rows="3" readonly></textarea></label>
             <div class="actions">
               <button class="primary-btn" type="button" data-copy-target="#respond-link">複製參加者連結</button>
-              <button class="ghost-btn" type="button" data-copy-target="#results-link">複製結果頁連結</button>
-              <button class="ghost-btn" type="button" data-copy-target="#admin-key-output">複製管理密鑰</button>
+              <button class="ghost-btn" type="button" data-copy-target="#manage-link">複製管理連結</button>
+              <button class="ghost-btn" type="button" data-copy-target="#admin-key-output">複製密鑰</button>
             </div>
-            <p class="muted-text">修改最終時間時，必須同時具備結果連結與這組密鑰。請分開保存。</p>
           </div>
           <div id="qr-code" class="qr-code"></div>
         </div>

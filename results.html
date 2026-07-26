@@ -3,90 +3,60 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>會議時間統計</title>
+    <title>活動管理｜EventRegistration</title>
     <link rel="stylesheet" href="./css/styles.css" />
   </head>
   <body>
     <div id="config-error" class="config-error hidden">
-      <h1>結果頁連結不完整</h1>
-      <p>網址缺少 meeting_id，請向發起人索取完整連結。</p>
+      <h1>管理連結不完整</h1><p>網址缺少 event_id，請使用完整管理連結。</p>
       <a class="primary-btn as-link" href="./index.html">回首頁</a>
     </div>
 
-    <main id="results-app" class="shell hidden">
+    <main id="manage-app" class="shell hidden">
       <header class="page-header">
-        <div>
-          <p class="eyebrow">統計結果</p>
-          <h1>會議可行時段</h1>
-        </div>
-        <div class="actions">
-          <span id="sync-status" class="sync-pill">尚未同步</span>
-        </div>
+        <div><p class="eyebrow">Organizer dashboard</p><h1>活動管理</h1></div>
+        <div class="actions"><span id="sync-status" class="sync-pill">連線中</span><a class="ghost-btn as-link" href="./index.html">回首頁</a></div>
       </header>
 
-      <section class="dashboard-grid">
-        <div id="result-info" class="panel"></div>
-        <div class="panel qr-panel">
-          <label><span>參加者連結</span><textarea id="participant-link" rows="3" readonly></textarea></label>
-          <div id="qr-code" class="qr-code"></div>
-        </div>
-      </section>
+      <section id="event-summary" class="panel"></section>
 
       <section class="panel admin-panel">
-        <div class="section-heading">
-          <p class="eyebrow">管理權限</p>
-          <h2>輸入六位數管理密鑰</h2>
-        </div>
+        <div class="section-heading"><p class="eyebrow">管理權限</p><h2>輸入六位數管理密鑰</h2></div>
         <form id="admin-form" class="admin-form">
-          <label><span>管理密鑰（不會寫入網址）</span><input name="admin_key" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="off" /></label>
-          <button class="primary-btn" type="submit">解鎖修改功能</button>
+          <label><span>管理密鑰</span><input name="admin_key" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="off" /></label>
+          <button class="primary-btn" type="submit">解鎖管理功能</button>
         </form>
-        <p id="admin-status" class="status-line">未解鎖時仍可查看統計，但不能修改最終時間。</p>
+        <p id="admin-status" class="status-line">報名資料只有密鑰驗證成功後才會從 Firebase 載入。</p>
       </section>
 
-      <section class="panel">
-        <div class="section-heading">
-          <p class="eyebrow">Calendar</p>
-          <h2>時段統計</h2>
-        </div>
-        <div id="stats-grid" class="calendar-grid" tabindex="0" aria-label="時段統計，可左右滑動"></div>
-      </section>
+      <div id="admin-content" class="hidden">
+        <section class="dashboard-grid">
+          <form id="schedule-form" class="panel">
+            <div class="section-heading"><p class="eyebrow">報名期間</p><h2>調整起訖時間</h2></div>
+            <label><span>報名開始</span><input name="registration_start_at" type="datetime-local" required /></label>
+            <label><span>報名結束</span><input name="registration_end_at" type="datetime-local" required /></label>
+            <button class="primary-btn" type="submit">儲存時間</button>
+            <p id="schedule-status" class="status-line"></p>
+          </form>
 
-      <section class="dashboard-grid">
-        <div class="panel">
-          <div class="section-heading">
-            <p class="eyebrow">Recommendation</p>
-            <h2>推薦時段</h2>
+          <section class="panel danger-panel">
+            <div class="section-heading"><p class="eyebrow">報名狀態</p><h2>關閉報名</h2></div>
+            <p class="muted-text">關閉後不再接受新報名，既有資料仍可下載至四週到期。此操作不可重新開啟。</p>
+            <button id="close-registration" class="danger-btn" type="button">關閉報名</button>
+            <p id="close-status" class="status-line"></p>
+          </section>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading inline-heading">
+            <div><p class="eyebrow">Registrations</p><h2>報名資料</h2></div>
+            <button id="download-csv" class="primary-btn" type="button">下載 CSV</button>
           </div>
-          <ol id="recommendations" class="recommend-list"></ol>
-        </div>
-
-        <div class="panel">
-          <div class="section-heading">
-            <p class="eyebrow">Final</p>
-            <h2>最終時間</h2>
-          </div>
-          <div id="final-panel"></div>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="section-heading">
-          <p class="eyebrow">Participants</p>
-          <h2>參加者回覆</h2>
-        </div>
-        <div class="table-wrap">
-          <table id="participant-table">
-            <thead>
-              <tr><th>姓名</th><th>已選時段</th><th>最後更新</th><th>備註</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </section>
+          <p id="registration-count" class="muted-text"></p>
+          <div class="table-wrap"><table id="registration-table"><thead></thead><tbody></tbody></table></div>
+        </section>
+      </div>
     </main>
-
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script type="module" src="./js/results.js"></script>
   </body>
 </html>

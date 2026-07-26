@@ -2,46 +2,62 @@
   "rules": {
     ".read": false,
     ".write": false,
-    "meetingCatalog": {
-      ".read": "auth != null",
+    "eventCatalog": {
+      ".read": false,
       ".indexOn": ["expires_at"],
-      "$meetingId": {
-        ".write": "auth != null && ((!data.exists() && root.child('meetings').child($meetingId).child('settings').child('created_by').val() === auth.uid) || (!newData.exists() && ((data.child('expires_at').isNumber() && data.child('expires_at').val() <= now) || (root.child('adminKeys').child($meetingId).isString() && root.child('adminKeyClaims').child($meetingId).child(auth.uid).val() === root.child('adminKeys').child($meetingId).val()))))",
-        ".validate": "!newData.exists() || ($meetingId.matches(/^m\\d{3}-\\d{3}-\\d{3}$/) && newData.hasChildren(['meeting_id', 'created_at', 'expires_at']) && newData.child('meeting_id').val() === $meetingId && newData.child('created_at').val() === root.child('meetings').child($meetingId).child('settings').child('created_at').val() && newData.child('expires_at').val() === root.child('meetings').child($meetingId).child('settings').child('expires_at').val())"
+      "$eventId": {
+        ".write": "auth != null && !data.exists() && newData.exists() && root.child('events').child($eventId).child('public').child('created_by').val() === auth.uid",
+        ".validate": "$eventId.matches(/^e\\d{3}-\\d{3}-\\d{3}$/) && newData.hasChildren(['event_id', 'created_at', 'expires_at']) && newData.child('event_id').val() === $eventId && newData.child('created_at').val() === root.child('events').child($eventId).child('public').child('created_at').val() && newData.child('expires_at').val() === root.child('events').child($eventId).child('public').child('expires_at').val()"
       }
     },
     "adminKeys": {
-      "$meetingId": {
+      "$eventId": {
         ".read": false,
-        ".write": "auth != null && ((!data.exists() && $meetingId.matches(/^m\\d{3}-\\d{3}-\\d{3}$/) && newData.isString() && newData.val().matches(/^\\d{6}$/)) || (data.isString() && root.child('adminKeyClaims').child($meetingId).child(auth.uid).val() === data.val()) || (!newData.exists() && root.child('meetingCatalog').child($meetingId).child('expires_at').val() <= now))",
+        ".write": "auth != null && ((!data.exists() && $eventId.matches(/^e\\d{3}-\\d{3}-\\d{3}$/) && newData.isString() && newData.val().matches(/^\\d{6}$/)) || (data.isString() && root.child('adminKeyClaims').child($eventId).child(auth.uid).val() === data.val()))",
         ".validate": "!newData.exists() || (newData.isString() && newData.val().matches(/^\\d{6}$/))"
       }
     },
     "adminKeyClaims": {
-      "$meetingId": {
+      "$eventId": {
         ".read": false,
-        ".write": "auth != null && !newData.exists() && ((root.child('meetingCatalog').child($meetingId).child('expires_at').val() <= now) || (root.child('adminKeys').child($meetingId).isString() && root.child('adminKeyClaims').child($meetingId).child(auth.uid).val() === root.child('adminKeys').child($meetingId).val()))",
         "$uid": {
-          ".write": "auth != null && auth.uid === $uid && root.child('adminKeys').child($meetingId).isString() && newData.val() === root.child('adminKeys').child($meetingId).val()",
-          ".validate": "!newData.exists() || (newData.isString() && newData.val().matches(/^\\d{6}$/))"
+          ".write": "auth != null && auth.uid === $uid && root.child('adminKeys').child($eventId).isString() && newData.val() === root.child('adminKeys').child($eventId).val()",
+          ".validate": "newData.isString() && newData.val().matches(/^\\d{6}$/)"
         }
       }
     },
-    "meetings": {
-      "$meetingId": {
-        ".read": "auth != null && (!data.exists() || (data.child('settings').child('expires_at').isNumber() && data.child('settings').child('expires_at').val() > now))",
-        ".write": "auth != null && !newData.exists() && ((data.child('settings').child('expires_at').isNumber() && data.child('settings').child('expires_at').val() <= now) || (root.child('adminKeys').child($meetingId).isString() && root.child('adminKeyClaims').child($meetingId).child(auth.uid).val() === root.child('adminKeys').child($meetingId).val()))",
-        "settings": {
-          ".write": "auth != null && root.child('adminKeys').child($meetingId).isString() && root.child('adminKeyClaims').child($meetingId).child(auth.uid).val() === root.child('adminKeys').child($meetingId).val() && ((!data.exists() && newData.child('created_by').val() === auth.uid) || data.exists())",
-          ".validate": "newData.hasChildren(['title', 'description', 'organizer_name', 'start_date', 'end_date', 'start_time', 'end_time', 'slot_minutes', 'include_saturday', 'include_sunday', 'response_deadline', 'status', 'selected_final_slot', 'created_at', 'expires_at', 'created_by']) && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 200 && newData.child('description').isString() && newData.child('description').val().length <= 2000 && newData.child('organizer_name').isString() && newData.child('organizer_name').val().length <= 100 && newData.child('start_date').isString() && newData.child('start_date').val().matches(/^\\d{4}-\\d{2}-\\d{2}$/) && newData.child('end_date').isString() && newData.child('end_date').val().matches(/^\\d{4}-\\d{2}-\\d{2}$/) && newData.child('start_time').isString() && newData.child('start_time').val().matches(/^\\d{2}:\\d{2}$/) && newData.child('end_time').isString() && newData.child('end_time').val().matches(/^\\d{2}:\\d{2}$/) && newData.child('slot_minutes').isNumber() && newData.child('slot_minutes').val() >= 30 && newData.child('slot_minutes').val() <= 240 && newData.child('include_saturday').isBoolean() && newData.child('include_sunday').isBoolean() && newData.child('response_deadline').isString() && newData.child('status').isString() && newData.child('status').val().matches(/^(open|closed|finalized|cancelled)$/) && newData.child('selected_final_slot').isString() && (newData.child('selected_final_slot').val() === '' || newData.child('selected_final_slot').val().matches(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$/)) && newData.child('created_at').isNumber() && (data.exists() || (newData.child('created_at').val() >= now - 600000 && newData.child('created_at').val() <= now + 600000)) && newData.child('expires_at').val() === newData.child('created_at').val() + 1814400000 && newData.child('created_by').isString()"
+    "events": {
+      "$eventId": {
+        "public": {
+          ".read": "auth != null && data.child('expires_at').isNumber() && data.child('expires_at').val() > now",
+          ".write": "auth != null && !data.exists() && newData.child('created_by').val() === auth.uid && root.child('adminKeys').child($eventId).isString() && root.child('adminKeyClaims').child($eventId).child(auth.uid).val() === root.child('adminKeys').child($eventId).val()",
+          ".validate": "newData.hasChildren(['title', 'organizer_name', 'description_content', 'description_format', 'registration_start_at', 'registration_end_at', 'capacity', 'registration_count', 'status', 'created_at', 'expires_at', 'created_by']) && newData.child('title').isString() && newData.child('title').val().length > 0 && newData.child('title').val().length <= 200 && newData.child('organizer_name').isString() && newData.child('organizer_name').val().length <= 100 && newData.child('description_content').isString() && newData.child('description_content').val().length <= 10000 && newData.child('description_format').isString() && newData.child('description_format').val().matches(/^(text|html)$/) && newData.child('registration_start_at').isNumber() && newData.child('registration_end_at').isNumber() && newData.child('registration_start_at').val() < newData.child('registration_end_at').val() && newData.child('registration_end_at').val() <= newData.child('expires_at').val() && newData.child('capacity').isNumber() && newData.child('capacity').val() >= 1 && newData.child('capacity').val() <= 5000 && newData.child('registration_count').isNumber() && newData.child('registration_count').val() >= 0 && newData.child('registration_count').val() <= newData.child('capacity').val() && newData.child('status').isString() && newData.child('status').val().matches(/^(open|closed)$/) && newData.child('created_at').isNumber() && (data.exists() || (newData.child('created_at').val() >= now - 600000 && newData.child('created_at').val() <= now + 600000)) && newData.child('expires_at').val() === newData.child('created_at').val() + 2419200000 && newData.child('created_by').isString()",
+          "registration_start_at": {
+            ".write": "auth != null && data.exists() && root.child('adminKeys').child($eventId).isString() && root.child('adminKeyClaims').child($eventId).child(auth.uid).val() === root.child('adminKeys').child($eventId).val()"
+          },
+          "registration_end_at": {
+            ".write": "auth != null && data.exists() && root.child('adminKeys').child($eventId).isString() && root.child('adminKeyClaims').child($eventId).child(auth.uid).val() === root.child('adminKeys').child($eventId).val()"
+          },
+          "status": {
+            ".write": "auth != null && data.val() === 'open' && newData.val() === 'closed' && root.child('adminKeys').child($eventId).isString() && root.child('adminKeyClaims').child($eventId).child(auth.uid).val() === root.child('adminKeys').child($eventId).val()"
+          },
+          "registration_count": {
+            ".write": "auth != null && data.isNumber() && newData.isNumber() && newData.val() === data.val() + 1 && data.parent().child('status').val() === 'open' && data.parent().child('registration_start_at').val() <= now && data.parent().child('registration_end_at').val() > now && data.parent().child('expires_at').val() > now && data.val() < data.parent().child('capacity').val()"
+          },
+          "custom_fields": {
+            "$fieldId": {
+              ".validate": "$fieldId.matches(/^f_[a-z0-9]{8}$/) && newData.hasChildren(['label', 'order']) && newData.child('label').isString() && newData.child('label').val().length > 0 && newData.child('label').val().length <= 60 && newData.child('order').isNumber() && newData.child('order').val() >= 0 && newData.child('order').val() < 20"
+            }
+          }
         },
-        "responses": {
-          "$responseId": {
-            ".write": "auth != null && root.child('meetings').child($meetingId).child('settings').child('expires_at').val() > now && root.child('meetings').child($meetingId).child('settings').child('status').val() === 'open' && newData.exists()",
-            ".validate": "$responseId.matches(/^[a-f0-9]{64}$/) && newData.hasChildren(['participant_name', 'name_key', 'availability', 'note', 'updated_at', 'updated_by']) && newData.child('participant_name').isString() && newData.child('participant_name').val().length > 0 && newData.child('participant_name').val().length <= 100 && newData.child('name_key').val() === $responseId && newData.child('availability').exists() && newData.child('note').isString() && newData.child('note').val().length <= 500 && newData.child('updated_at').isNumber() && newData.child('updated_at').val() >= now - 600000 && newData.child('updated_at').val() <= now + 600000 && newData.child('updated_by').val() === auth.uid",
-            "availability": {
-              "$slot": {
-                ".validate": "($slot === '_placeholder' && newData.val() === false) || ($slot.matches(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$/) && newData.val() === true)"
+        "registrations": {
+          ".read": "auth != null && root.child('events').child($eventId).child('public').child('expires_at').val() > now && root.child('adminKeys').child($eventId).isString() && root.child('adminKeyClaims').child($eventId).child(auth.uid).val() === root.child('adminKeys').child($eventId).val()",
+          "$registrationId": {
+            ".write": "auth != null && !data.exists() && newData.exists() && $registrationId.matches(/^[a-f0-9]{64}$/) && root.child('events').child($eventId).child('public').child('status').val() === 'open' && root.child('events').child($eventId).child('public').child('registration_start_at').val() <= now && root.child('events').child($eventId).child('public').child('registration_end_at').val() > now && root.child('events').child($eventId).child('public').child('expires_at').val() > now && root.child('events').child($eventId).child('public').child('registration_count').val() < root.child('events').child($eventId).child('public').child('capacity').val()",
+            ".validate": "newData.hasChildren(['name', 'email', 'phone', 'custom_answers', 'submitted_at', 'submitted_by']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 100 && newData.child('email').isString() && newData.child('email').val().length > 3 && newData.child('email').val().length <= 254 && newData.child('email').val().matches(/^[^@ ]+@[^@ ]+\\.[^@ ]+$/) && newData.child('phone').isString() && newData.child('phone').val().length <= 50 && newData.child('submitted_at').isNumber() && newData.child('submitted_at').val() >= now - 600000 && newData.child('submitted_at').val() <= now + 600000 && newData.child('submitted_by').val() === auth.uid",
+            "custom_answers": {
+              "$fieldId": {
+                ".validate": "($fieldId === '_placeholder' && newData.val() === '') || (root.child('events').child($eventId).child('public').child('custom_fields').child($fieldId).exists() && newData.isString() && newData.val().length <= 500)"
               }
             }
           }

@@ -3,75 +3,55 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>會議時間調查系統</title>
+    <meta name="description" content="免登入的活動報名系統，支援自訂欄位、人數上限與資料下載。" />
+    <title>EventRegistration 活動報名系統</title>
     <link rel="stylesheet" href="./css/styles.css" />
   </head>
   <body>
     <main class="shell">
       <header class="page-header">
         <div>
-          <h1>會議時間調查系統</h1>
+          <p class="eyebrow">EventRegistration</p>
+          <h1>活動報名系統</h1>
         </div>
-        <a class="primary-btn as-link" href="./create.html">建立新調查</a>
+        <a class="primary-btn as-link" href="./create.html">建立報名表單</a>
       </header>
 
       <section class="notice">
-        <strong>提醒</strong>
-        <span>本系統無須登入。請妥善保存連結或會議 ID、六位數管理密鑰；如果遺失，只能等待系統自動清除。參加者不需密鑰即可填寫，請勿輸入敏感個資；每個會議調查建立三週後，資料會自動停止存取並清除。</span>
+        <strong>使用提醒</strong>
+        <span>參加者不需要登入即可報名。請主辦人妥善保存管理連結與六位數密鑰；活動建立四週後，所有資料會停止存取並自動刪除。</span>
       </section>
 
       <div class="dashboard-grid">
         <section class="panel">
           <div class="section-heading">
-            <p class="eyebrow">開始使用</p>
-            <h2>快速建立會議調查</h2>
+            <p class="eyebrow">建立活動</p>
+            <h2>快速建立匿名報名連結</h2>
           </div>
-          <p class="muted-text">設定候選日期與時段後，系統會產生參加者連結、結果連結，以及一組不會放進網址的六位數管理密鑰。</p>
-          <a class="primary-btn as-link" href="./create.html">建立新的調查</a>
+          <p class="muted-text">設定報名時間、人數上限、活動說明與自訂欄位後，即可取得分享連結與 QR Code。</p>
+          <a class="primary-btn as-link" href="./create.html">建立新的報名表單</a>
         </section>
 
         <section class="panel">
           <div class="section-heading">
-            <p class="eyebrow">既有調查</p>
-            <h2>使用連結或會議 ID 開啟</h2>
+            <p class="eyebrow">主辦人管理</p>
+            <h2>使用活動連結或 ID 進入</h2>
           </div>
-          <form id="open-meeting-form">
-            <label><span>會議連結或 ID</span><input name="meeting_reference" required placeholder="m000-000-000" autocomplete="off" /></label>
-            <button class="ghost-btn" type="submit">查看結果</button>
+          <form id="open-event-form">
+            <label><span>管理連結或活動 ID</span><input name="event_reference" required placeholder="e000-000-000" autocomplete="off" /></label>
+            <button class="ghost-btn" type="submit">開啟管理頁</button>
           </form>
         </section>
       </div>
 
       <section class="panel">
         <div class="section-heading inline-heading">
-          <div><p class="eyebrow">本機記錄</p><h2>這個瀏覽器建立的會議</h2></div>
+          <div><p class="eyebrow">本機記錄</p><h2>這個瀏覽器建立的活動</h2></div>
           <button id="clear-recent" class="ghost-btn small-btn" type="button">清除本機記錄</button>
         </div>
-        <ul id="recent-meetings" class="recent-list"></ul>
+        <ul id="recent-events" class="recent-list"></ul>
       </section>
     </main>
-
-    <button id="debug-trigger" class="debug-trigger" type="button" aria-label="開啟 Firebase meeting 除錯資訊" title="Firebase meeting 除錯資訊">🔑</button>
-
-    <dialog id="debug-dialog" class="debug-dialog">
-      <div class="debug-dialog-header">
-        <div>
-          <p class="eyebrow">Debug</p>
-          <h2>Firebase meeting 資訊</h2>
-        </div>
-        <button id="debug-close" class="ghost-btn small-btn" type="button">關閉</button>
-      </div>
-      <div class="actions">
-        <button id="debug-refresh" class="ghost-btn small-btn" type="button">重新整理</button>
-        <span id="debug-status" class="muted-text" aria-live="polite"></span>
-      </div>
-      <div class="table-wrap debug-table-wrap">
-        <table>
-          <thead><tr><th>Firebase ID／路徑</th><th>失效時間</th><th>狀態</th></tr></thead>
-          <tbody id="debug-meetings"></tbody>
-        </table>
-      </div>
-    </dialog>
     <script type="module" src="./js/index.js"></script>
   </body>
 </html>
