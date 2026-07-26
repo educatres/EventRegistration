@@ -1,9 +1,9 @@
 export const MEETING_LIFETIME_MS = 21 * 24 * 60 * 60 * 1000;
 
 export function generateMeetingId() {
-  const bytes = crypto.getRandomValues(new Uint8Array(9));
-  const token = Array.from(bytes, (value) => value.toString(36).padStart(2, '0')).join('').slice(0, 15);
-  return `m-${token.match(/.{1,5}/g).join('-')}`;
+  const values = crypto.getRandomValues(new Uint32Array(1));
+  const digits = String(values[0] % 1_000_000_000).padStart(9, '0');
+  return `m${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 9)}`;
 }
 
 export function generateAdminKey() {
@@ -26,7 +26,7 @@ export function parseMeetingReference(value, baseHref = window.location.href) {
   const raw = String(value || '').trim();
   if (!raw) return '';
 
-  if (/^m-[a-z0-9-]+$/i.test(raw)) return raw;
+  if (/^m\d{3}-\d{3}-\d{3}$/.test(raw)) return raw;
 
   try {
     return getMeetingId(new URL(raw, baseHref).search) || raw;

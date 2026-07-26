@@ -7,13 +7,13 @@
       ".indexOn": ["expires_at"],
       "$meetingId": {
         ".write": "auth != null && ((!data.exists() && root.child('meetings').child($meetingId).child('settings').child('created_by').val() === auth.uid) || (!newData.exists() && ((data.child('expires_at').isNumber() && data.child('expires_at').val() <= now) || (root.child('adminKeys').child($meetingId).isString() && root.child('adminKeyClaims').child($meetingId).child(auth.uid).val() === root.child('adminKeys').child($meetingId).val()))))",
-        ".validate": "!newData.exists() || (newData.hasChildren(['meeting_id', 'created_at', 'expires_at']) && newData.child('meeting_id').val() === $meetingId && newData.child('created_at').val() === root.child('meetings').child($meetingId).child('settings').child('created_at').val() && newData.child('expires_at').val() === root.child('meetings').child($meetingId).child('settings').child('expires_at').val())"
+        ".validate": "!newData.exists() || ($meetingId.matches(/^m\\d{3}-\\d{3}-\\d{3}$/) && newData.hasChildren(['meeting_id', 'created_at', 'expires_at']) && newData.child('meeting_id').val() === $meetingId && newData.child('created_at').val() === root.child('meetings').child($meetingId).child('settings').child('created_at').val() && newData.child('expires_at').val() === root.child('meetings').child($meetingId).child('settings').child('expires_at').val())"
       }
     },
     "adminKeys": {
       "$meetingId": {
         ".read": false,
-        ".write": "auth != null && ((!data.exists() && newData.isString() && newData.val().matches(/^\\d{6}$/)) || (data.isString() && root.child('adminKeyClaims').child($meetingId).child(auth.uid).val() === data.val()) || (!newData.exists() && root.child('meetingCatalog').child($meetingId).child('expires_at').val() <= now))",
+        ".write": "auth != null && ((!data.exists() && $meetingId.matches(/^m\\d{3}-\\d{3}-\\d{3}$/) && newData.isString() && newData.val().matches(/^\\d{6}$/)) || (data.isString() && root.child('adminKeyClaims').child($meetingId).child(auth.uid).val() === data.val()) || (!newData.exists() && root.child('meetingCatalog').child($meetingId).child('expires_at').val() <= now))",
         ".validate": "!newData.exists() || (newData.isString() && newData.val().matches(/^\\d{6}$/))"
       }
     },
