@@ -41,7 +41,7 @@
             ".write": "auth != null && data.exists() && root.child('adminKeys').child($eventId).isString() && root.child('adminKeyClaims').child($eventId).child(auth.uid).val() === root.child('adminKeys').child($eventId).val()"
           },
           "status": {
-            ".write": "auth != null && data.val() === 'open' && newData.val() === 'closed' && root.child('adminKeys').child($eventId).isString() && root.child('adminKeyClaims').child($eventId).child(auth.uid).val() === root.child('adminKeys').child($eventId).val()"
+            ".write": "auth != null && data.isString() && newData.isString() && data.val() !== newData.val() && newData.val().matches(/^(open|closed)$/) && root.child('adminKeys').child($eventId).isString() && root.child('adminKeyClaims').child($eventId).child(auth.uid).val() === root.child('adminKeys').child($eventId).val()"
           },
           "registration_count": {
             ".write": "auth != null && data.isNumber() && newData.isNumber() && newData.val() === data.val() + 1 && data.parent().child('status').val() === 'open' && data.parent().child('registration_start_at').val() <= now && data.parent().child('registration_end_at').val() > now && data.parent().child('expires_at').val() > now && data.val() < data.parent().child('capacity').val()"

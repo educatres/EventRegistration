@@ -148,9 +148,10 @@ export async function updateEventSchedule(eventId, startAt, endAt) {
   });
 }
 
-export async function closeEvent(eventId) {
+export async function updateEventStatus(eventId, status) {
   await ensureAuth();
-  await update(ref(database, `events/${eventId}/public`), { status: 'closed' });
+  if (!['open', 'closed'].includes(status)) throw new Error('無效的報名狀態。');
+  await update(ref(database, `events/${eventId}/public`), { status });
 }
 
 export async function deleteEvent(eventId) {

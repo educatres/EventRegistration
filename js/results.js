@@ -1,6 +1,6 @@
 import { buildEventUrl, eventAvailability, formatDateTime, fromDateTimeLocal, getEventId, toDateTimeLocal } from './config.js';
 import { renderDescription } from './content.js';
-import { claimAdminKey, closeEvent, deleteEvent, isEventUnavailableError, subscribeEventPublic, subscribeRegistrations, updateEventSchedule } from './firebase-store.js';
+import { claimAdminKey, deleteEvent, isEventUnavailableError, subscribeEventPublic, subscribeRegistrations, updateEventSchedule, updateEventStatus } from './firebase-store.js';
 import { getLocalAdminKey, removeLocalEvent } from './local-events.js';
 import { renderQr } from './qr.js';
 
@@ -67,14 +67,22 @@ scheduleForm?.addEventListener('submit', async (event) => {
 });
 
 document.querySelector('#close-registration')?.addEventListener('click', async () => {
-  if (!window.confirm('確定關閉報名？關閉後不可重新開啟。')) return;
+  const reopening = eventData.status === 'closed';
+  const action = reopening ? '重新開啟' : '關閉';
+  if (!window.confirm(`確定${action}報名？`)) return;
+  const statusButton = document.querySelector('#close-registration');
   const closeStatus = document.querySelector('#close-status');
-  closeStatus.textContent = '正在關閉...';
+  statusButton.disabled = true;
+  closeStatus.textContent = `正在${action}...`;
   try {
-    await closeEvent(eventId);
-    closeStatus.textContent = '報名已關閉，既有資料仍可下載。';
+    await updateEventStatus(eventId, reopening ? 'open' : 'closed');
+    closeStatus.textContent = reopening
+      ? '報名已重新開啟；是否可立即報名仍取決於起訖時間與剩餘名額。'
+      : '報名已關閉，既有資料仍可下載。';
   } catch (error) {
-    closeStatus.textContent = error?.message || '關閉失敗。';
+    closeStatus.textContent = error?.message || `${action}失敗。`;
+  } finally {
+    statusButton.disabled = false;
   }
 });
 
@@ -174,7 +182,12 @@ function renderSummary() {
   summary.innerHTML = `<div class="section-heading"><p class="eyebrow">${escapeHtml(eventId)}</p><h2>${escapeHtml(eventData.title)}</h2></div><dl><div><dt>活動聯絡人</dt><dd>${escapeHtml(eventData.organizer_name || '未填寫')}</dd></div><div><dt>報名狀態</dt><dd><span class="availability-badge ${availability.state}">${availability.label}</span></dd></div><div><dt>目前人數</dt><dd>${eventData.registration_count}/${eventData.capacity}</dd></div><div><dt>報名期間</dt><dd>${formatDateTime(eventData.registration_start_at)} 至 ${formatDateTime(eventData.registration_end_at)}</dd></div><div><dt>自動刪除</dt><dd>${formatDateTime(eventData.expires_at)}</dd></div></dl><div data-description></div>`;
   renderDescription(summary.querySelector('[data-description]'), eventData.description_content, eventData.description_format);
   const closeButton = document.querySelector('#close-registration');
-  if (closeButton) closeButton.disabled = eventData.status === 'closed';
+  if (closeButton) {
+    const reopening = eventData.status === 'closed';
+    closeButton.textContent = reopening ? '重新開啟報名' : '關閉報名';
+    closeButton.classList.toggle('danger-btn', !reopening);
+    closeButton.classList.toggle('primary-btn', reopening);
+  }
 }
 
 function updateDeletionCountdown() {
