@@ -17,7 +17,7 @@
 
       <section class="notice">
         <strong>提醒</strong>
-        <span>本系統無須登入。請妥善保存連結或會議 ID、六位數管理密鑰；如果遺失，只能等待系統自動清除。參加者不需密鑰即可填寫，請勿輸入敏感個資；每個會議建立三週後，Firebase 資料會自動停止存取並清除。</span>
+        <span>本系統無須登入。請妥善保存連結或會議 ID、六位數管理密鑰；如果遺失，只能等待系統自動清除。參加者不需密鑰即可填寫，請勿輸入敏感個資；每個會議建立三週後，資料會自動停止存取並清除。</span>
       </section>
 
       <div class="dashboard-grid">
@@ -50,6 +50,28 @@
         <ul id="recent-meetings" class="recent-list"></ul>
       </section>
     </main>
+
+    <button id="debug-trigger" class="debug-trigger" type="button" aria-label="開啟 Firebase meeting 除錯資訊" title="Firebase meeting 除錯資訊">🔑</button>
+
+    <dialog id="debug-dialog" class="debug-dialog">
+      <div class="debug-dialog-header">
+        <div>
+          <p class="eyebrow">Debug</p>
+          <h2>Firebase meeting 資訊</h2>
+        </div>
+        <button id="debug-close" class="ghost-btn small-btn" type="button">關閉</button>
+      </div>
+      <div class="actions">
+        <button id="debug-refresh" class="ghost-btn small-btn" type="button">重新整理</button>
+        <span id="debug-status" class="muted-text" aria-live="polite"></span>
+      </div>
+      <div class="table-wrap debug-table-wrap">
+        <table>
+          <thead><tr><th>Firebase ID／路徑</th><th>失效時間</th><th>狀態</th></tr></thead>
+          <tbody id="debug-meetings"></tbody>
+        </table>
+      </div>
+    </dialog>
     <script type="module" src="./js/index.js"></script>
   </body>
 </html>

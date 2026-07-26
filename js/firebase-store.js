@@ -77,6 +77,16 @@ export async function getMeeting(meetingId) {
   return { meeting_id: meetingId, ...snapshot.val() };
 }
 
+export async function getMeetingCatalog() {
+  await ensureAuth();
+  const snapshot = await get(ref(database, 'meetingCatalog'));
+  if (!snapshot.exists()) return [];
+  return Object.entries(snapshot.val()).map(([meetingId, entry]) => ({
+    ...entry,
+    meeting_id: entry.meeting_id || meetingId,
+  }));
+}
+
 export async function subscribeMeeting(meetingId, onData, onError) {
   await ensureAuth();
   return onValue(ref(database, `meetings/${meetingId}`), (snapshot) => {
