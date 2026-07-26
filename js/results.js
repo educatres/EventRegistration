@@ -1,7 +1,8 @@
-import { eventAvailability, formatDateTime, fromDateTimeLocal, getEventId, toDateTimeLocal } from './config.js';
+import { buildEventUrl, eventAvailability, formatDateTime, fromDateTimeLocal, getEventId, toDateTimeLocal } from './config.js';
 import { renderDescription } from './content.js';
 import { claimAdminKey, closeEvent, deleteEvent, isEventUnavailableError, subscribeEventPublic, subscribeRegistrations, updateEventSchedule } from './firebase-store.js';
 import { getLocalAdminKey, removeLocalEvent } from './local-events.js';
+import { renderQr } from './qr.js';
 
 const eventId = getEventId();
 const app = document.querySelector('#manage-app');
@@ -20,6 +21,10 @@ const deleteEventId = document.querySelector('#delete-event-id');
 const deleteEventConfirmation = document.querySelector('#delete-event-confirmation');
 const deleteEventConfirm = document.querySelector('#delete-event-confirm');
 const deleteEventStatus = document.querySelector('#delete-event-status');
+const participantSharePanel = document.querySelector('#participant-share-panel');
+const participantLink = document.querySelector('#participant-link');
+const participantQrCode = document.querySelector('#participant-qr-code');
+const participantLinkStatus = document.querySelector('#participant-link-status');
 let eventData;
 let registrations = [];
 let adminUnlocked = false;
@@ -74,6 +79,18 @@ document.querySelector('#close-registration')?.addEventListener('click', async (
 });
 
 document.querySelector('#download-csv')?.addEventListener('click', downloadCsv);
+
+document.querySelector('#show-participant-link')?.addEventListener('click', showParticipantLink);
+document.querySelector('#close-participant-link')?.addEventListener('click', () => participantSharePanel.classList.add('hidden'));
+document.querySelector('#copy-participant-link')?.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(participantLink.value);
+    participantLinkStatus.textContent = '報名網址已複製。';
+  } catch {
+    participantLink.select();
+    participantLinkStatus.textContent = '請手動複製報名網址。';
+  }
+});
 
 document.querySelector('#delete-event')?.addEventListener('click', () => {
   deleteEventId.textContent = eventId;
@@ -205,6 +222,14 @@ function downloadCsv() {
   link.download = `${safeFilename(eventData.title)}-registrations.csv`;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function showParticipantLink() {
+  const url = buildEventUrl('./respond.html', eventId);
+  participantLink.value = url;
+  participantLinkStatus.textContent = '';
+  renderQr(participantQrCode, url);
+  participantSharePanel.classList.remove('hidden');
 }
 
 function csvCell(value) {

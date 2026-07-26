@@ -61,10 +61,28 @@
           </section>
         </section>
 
+        <section id="participant-share-panel" class="panel hidden">
+          <div class="section-heading inline-heading">
+            <div><p class="eyebrow">Participant link</p><h2>參加者報名網址</h2></div>
+            <button id="close-participant-link" class="ghost-btn small-btn" type="button">關閉</button>
+          </div>
+          <div class="result-layout">
+            <div>
+              <label><span>匿名報名網址</span><textarea id="participant-link" rows="3" readonly></textarea></label>
+              <button id="copy-participant-link" class="primary-btn" type="button">複製網址</button>
+              <p id="participant-link-status" class="status-line" aria-live="polite"></p>
+            </div>
+            <div id="participant-qr-code" class="qr-code" aria-label="參加者報名網址 QR Code"></div>
+          </div>
+        </section>
+
         <section class="panel">
           <div class="section-heading inline-heading">
             <div><p class="eyebrow">Registrations</p><h2>報名資料</h2></div>
-            <button id="download-csv" class="primary-btn" type="button">下載 CSV</button>
+            <div class="actions">
+              <button id="show-participant-link" class="ghost-btn" type="button">顯示報名網址與 QR Code</button>
+              <button id="download-csv" class="primary-btn" type="button">下載 CSV</button>
+            </div>
           </div>
           <p id="registration-count" class="muted-text"></p>
           <div class="table-wrap"><table id="registration-table"><thead></thead><tbody></tbody></table></div>
@@ -84,6 +102,7 @@
       </div>
       <p id="delete-event-status" class="status-line" aria-live="polite"></p>
     </dialog>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script type="module" src="./js/results.js"></script>
   </body>
 </html>
