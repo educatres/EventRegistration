@@ -381,6 +381,35 @@ select:focus {
   gap: 12px;
 }
 
+#stats-grid {
+  display: flex;
+  align-items: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 12px;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+#stats-grid .day-card {
+  width: 200px;
+  min-width: 200px;
+  flex: 0 0 200px;
+  padding: 10px;
+  scroll-snap-align: start;
+}
+
+#stats-grid .slot-list.vertical {
+  grid-template-columns: 1fr;
+}
+
+#stats-grid .stat-slot {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
 .day-card {
   border: 1px solid var(--line);
   border-radius: 8px;
