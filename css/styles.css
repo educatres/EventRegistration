@@ -38,6 +38,11 @@ button,
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .hidden {
   display: none !important;
 }
@@ -144,6 +149,13 @@ h3 {
 
 .section-heading.compact {
   margin-top: 26px;
+}
+
+.inline-heading {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
 }
 
 label {
@@ -261,6 +273,52 @@ select:focus {
 .disabled {
   opacity: 0.45;
   pointer-events: none;
+}
+
+.secret-output {
+  color: var(--accent-strong);
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+}
+
+.admin-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 360px) max-content;
+  gap: 12px;
+  align-items: end;
+}
+
+.admin-form label {
+  margin: 0;
+}
+
+.recent-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recent-list li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 12px;
+}
+
+.recent-list strong,
+.recent-list small {
+  display: block;
+}
+
+.recent-list small {
+  margin-top: 3px;
+  color: var(--muted);
 }
 
 .status-line,
@@ -505,6 +563,10 @@ th {
   .two-col,
   .three-col,
   .entry-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-form {
     grid-template-columns: 1fr;
   }
 

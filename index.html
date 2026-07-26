@@ -3,126 +3,56 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>會議時間調查系統｜Google 設定</title>
+    <title>會議時間調查系統</title>
     <link rel="stylesheet" href="./css/styles.css" />
   </head>
   <body>
     <main class="shell">
       <header class="page-header">
         <div>
-          <p class="eyebrow">GitHub Pages + Google Form / Sheet</p>
+          <p class="eyebrow">GitHub Pages + Firebase</p>
           <h1>會議時間調查系統</h1>
         </div>
-        <a class="ghost-btn as-link" href="./create.html">建立頁</a>
+        <a class="primary-btn as-link" href="./create.html">建立新調查</a>
       </header>
 
       <img class="intro-image" src="./Intro.png" alt="會議時間調查系統介紹" />
 
       <section class="notice">
-        <strong>公開資料提醒</strong>
-        <span>此版本不使用登入、OAuth 或後端。請只收集可公開的排程資訊，Google Sheet 設為公開檢視後，知道連結的人可能讀取內容。</span>
+        <strong>隱私提醒</strong>
+        <span>參加者不需登入或密鑰即可填寫。請勿輸入敏感個資；每個會議建立三週後，Firebase 資料會自動停止存取並清除。</span>
       </section>
 
-      <div class="layout-grid">
-        <form id="setup-form" class="panel">
+      <div class="dashboard-grid">
+        <section class="panel">
           <div class="section-heading">
-            <p class="eyebrow">Step 1</p>
-            <h2>Google 中繼資料</h2>
+            <p class="eyebrow">開始使用</p>
+            <h2>快速建立會議調查</h2>
           </div>
+          <p class="muted-text">設定候選日期與時段後，系統會產生參加者連結、結果連結，以及一組不會放進網址的六位數管理密鑰。</p>
+          <a class="primary-btn as-link" href="./create.html">建立新的調查</a>
+        </section>
 
-          <label>
-            <span>Google Sheet ID <b>*</b> <b>(只能放Google sheet ID, 請勿直接貼上整個分享網址)</b></span>
-            <input name="sheet_id" required autocomplete="off" />
-          </label>
-
-          <div class="two-col">
-            <label>
-              <span>Sheet 名稱</span>
-              <input name="sheet_name" placeholder="表單回應 1" autocomplete="off" />
-            </label>
-            <label>
-              <span>gid</span>
-              <input name="gid" placeholder="0" autocomplete="off" />
-            </label>
-          </div>
-
-          <label>
-            <span>Google Form submit URL <b>*</b></span>
-            <input name="form_url" required placeholder="https://docs.google.com/forms/d/e/.../formResponse" autocomplete="off" />
-          </label>
-
-          <div class="section-heading compact">
-            <p class="eyebrow">Step 2</p>
-            <h2>Google Form entry ID</h2>
-          </div>
-
-          <label>
-            <span>預填連結</span>
-            <textarea id="prefill-url" rows="4" placeholder="貼上 Google Form 預填連結"></textarea>
-          </label>
-
-          <div class="actions">
-            <button class="ghost-btn" type="button" id="parse-prefill">從預填連結帶入</button>
-            <button class="ghost-btn" type="button" id="show-markers">顯示欄位名稱</button>
-            <button class="ghost-btn" type="button" id="test-sheet">測試 Sheet</button>
-          </div>
-
-          <details class="advanced-fields">
-            <summary>欄位對應</summary>
-            <div class="entry-grid">
-              <label><span>meeting_id <b>*</b></span><input name="field_meeting_id" required placeholder="entry.xxxxx" /></label>
-              <label><span>event_type <b>*</b></span><input name="field_event_type" required placeholder="entry.xxxxx" /></label>
-              <label><span>meeting_title <b>*</b></span><input name="field_meeting_title" required placeholder="entry.xxxxx" /></label>
-              <label><span>meeting_description <b>*</b></span><input name="field_meeting_description" required placeholder="entry.xxxxx" /></label>
-              <label><span>organizer_name <b>*</b></span><input name="field_organizer_name" required placeholder="entry.xxxxx" /></label>
-              <label><span>start_date <b>*</b></span><input name="field_start_date" required placeholder="entry.xxxxx" /></label>
-              <label><span>end_date <b>*</b></span><input name="field_end_date" required placeholder="entry.xxxxx" /></label>
-              <label><span>start_time <b>*</b></span><input name="field_start_time" required placeholder="entry.xxxxx" /></label>
-              <label><span>end_time <b>*</b></span><input name="field_end_time" required placeholder="entry.xxxxx" /></label>
-              <label><span>slot_minutes <b>*</b></span><input name="field_slot_minutes" required placeholder="entry.xxxxx" /></label>
-              <label><span>include_saturday <b>*</b></span><input name="field_include_saturday" required placeholder="entry.xxxxx" /></label>
-              <label><span>include_sunday <b>*</b></span><input name="field_include_sunday" required placeholder="entry.xxxxx" /></label>
-              <label><span>response_deadline <b>*</b></span><input name="field_response_deadline" required placeholder="entry.xxxxx" /></label>
-              <label><span>participant_name <b>*</b></span><input name="field_participant_name" required placeholder="entry.xxxxx" /></label>
-              <label><span>participant_id <b>*</b></span><input name="field_participant_id" required placeholder="entry.xxxxx" /></label>
-              <label><span>availability_json <b>*</b></span><input name="field_availability_json" required placeholder="entry.xxxxx" /></label>
-              <label><span>note <b>*</b></span><input name="field_note" required placeholder="entry.xxxxx" /></label>
-              <label><span>selected_final_slot <b>*</b></span><input name="field_selected_final_slot" required placeholder="entry.xxxxx" /></label>
-              <label><span>client_timestamp <b>*</b></span><input name="field_client_timestamp" required placeholder="entry.xxxxx" /></label>
-              <label><span>extra_json <b>*</b></span><input name="field_extra_json" required placeholder="entry.xxxxx" /></label>
-            </div>
-          </details>
-
-          <div class="actions">
-            <button class="primary-btn" type="submit">儲存設定</button>
-            <a id="create-link" class="primary-btn as-link disabled" href="./create.html">建立新的調查</a>
-          </div>
-          <p id="setup-status" class="status-line" aria-live="polite"></p>
-        </form>
-
-        <aside class="panel">
+        <section class="panel">
           <div class="section-heading">
             <p class="eyebrow">既有調查</p>
-            <h2>開啟結果頁</h2>
+            <h2>使用連結或會議 ID 開啟</h2>
           </div>
-          <form id="open-existing-form">
-            <label>
-              <span>meeting_id</span>
-              <input name="existing_meeting_id" required placeholder="meeting_xxxxx" autocomplete="off" />
-            </label>
-            <button class="ghost-btn" type="submit">查看統計</button>
+          <form id="open-meeting-form">
+            <label><span>會議連結或 ID</span><input name="meeting_reference" required placeholder="m-xxxxx-xxxxx-xxxxx" autocomplete="off" /></label>
+            <button class="ghost-btn" type="submit">查看結果</button>
           </form>
-
-          <a class="manual-download" href="./操作手冊.pdf" download>下載操作手冊 PDF</a>
-
-          <div class="field-list">
-            <h3>Google Form 欄位</h3>
-            <p>meeting_id, event_type, meeting_title, meeting_description, organizer_name, start_date, end_date, start_time, end_time, slot_minutes, include_saturday, include_sunday, response_deadline, participant_name, participant_id, availability_json, note, selected_final_slot, client_timestamp, extra_json</p>
-          </div>
-        </aside>
+        </section>
       </div>
-    </main>
 
+      <section class="panel">
+        <div class="section-heading inline-heading">
+          <div><p class="eyebrow">本機記錄</p><h2>這個瀏覽器建立的會議</h2></div>
+          <button id="clear-recent" class="ghost-btn small-btn" type="button">清除本機記錄</button>
+        </div>
+        <ul id="recent-meetings" class="recent-list"></ul>
+      </section>
+    </main>
     <script type="module" src="./js/index.js"></script>
   </body>
 </html>

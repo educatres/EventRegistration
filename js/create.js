@@ -1,73 +1,64 @@
-import { buildConfigFromParams, buildSharedParams, buildUrl, generateId } from './config.js';
-import { submitMeetingEvent } from './google-form.js';
+import { buildMeetingUrl, generateAdminKey, generateMeetingId } from './config.js';
+import { createMeeting, ensureAuth } from './firebase-store.js';
 import { buildSlots, groupSlotsByDate } from './calendar.js';
 import { renderQr } from './qr.js';
 
-const configResult = buildConfigFromParams();
-const configError = document.querySelector('#config-error');
-const app = document.querySelector('#create-app');
 const form = document.querySelector('#meeting-form');
 const preview = document.querySelector('#slot-preview');
 const resultPanel = document.querySelector('#created-panel');
 const respondLink = document.querySelector('#respond-link');
 const resultsLink = document.querySelector('#results-link');
 const meetingIdOutput = document.querySelector('#meeting-id-output');
+const adminKeyOutput = document.querySelector('#admin-key-output');
+const expiryOutput = document.querySelector('#expiry-output');
 const qrCode = document.querySelector('#qr-code');
 const createStatus = document.querySelector('#create-status');
-const copyButtons = document.querySelectorAll('[data-copy-target]');
 
-let meetingId = generateId('meeting');
+initialize();
 
-if (!configResult.ok) {
-  configError.classList.remove('hidden');
-} else {
-  app.classList.remove('hidden');
-  form.elements.namedItem('start_time').value = '10:00';
-  form.elements.namedItem('end_time').value = '17:00';
-  form.elements.namedItem('slot_minutes').value = '60';
-  form.elements.namedItem('include_saturday').checked = false;
-  form.elements.namedItem('include_sunday').checked = false;
+async function initialize() {
+  setDefaults();
   renderPreview();
+  try {
+    await ensureAuth();
+  } catch {
+    createStatus.textContent = '無法連線 Firebase，請重新整理後再試。';
+  }
 }
 
 form?.addEventListener('input', renderPreview);
-
-form?.addEventListener('reset', () => {
-  setTimeout(renderPreview, 0);
-});
+form?.addEventListener('reset', () => setTimeout(() => {
+  setDefaults();
+  renderPreview();
+}, 0));
 
 form?.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const config = configResult.config;
-  config.meetingId = meetingId;
+  const meetingId = generateMeetingId();
+  const adminKey = generateAdminKey();
   const meeting = readMeetingForm();
-
-  createStatus.textContent = '正在寫入 meeting_create 事件...';
+  createStatus.textContent = '正在 Firebase 建立調查...';
 
   try {
-    await submitMeetingEvent(config, {
-      event_type: 'meeting_create',
-      ...meeting,
-      include_saturday: String(meeting.include_saturday),
-      include_sunday: String(meeting.include_sunday),
-    });
-
-    const shared = buildSharedParams(config);
-    const respondUrl = buildUrl('./respond.html', shared);
-    const resultsUrl = buildUrl('./results.html', shared);
+    const created = await createMeeting(meetingId, adminKey, meeting);
+    const respondUrl = buildMeetingUrl('./respond.html', meetingId);
+    const resultsUrl = buildMeetingUrl('./results.html', meetingId);
     meetingIdOutput.value = meetingId;
+    adminKeyOutput.value = adminKey;
+    expiryOutput.value = new Date(created.expires_at).toLocaleString('zh-TW');
     respondLink.value = respondUrl;
     resultsLink.value = resultsUrl;
     renderQr(qrCode, respondUrl);
     resultPanel.classList.remove('hidden');
-    createStatus.textContent = '調查已建立。Google Sheet 同步可能需要幾秒鐘。';
-    meetingId = generateId('meeting');
+    saveRecentMeeting({ meetingId, title: meeting.meeting_title, adminKey, expiresAt: created.expires_at });
+    createStatus.textContent = '調查已建立並開始即時同步。請另外保存六位數管理密鑰。';
+    resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (error) {
-    createStatus.textContent = error.message || '寫入失敗，請確認 Google Form URL 與 entry ID。';
+    createStatus.textContent = firebaseErrorMessage(error, '建立失敗，請稍後再試。');
   }
 });
 
-copyButtons.forEach((button) => {
+document.querySelectorAll('[data-copy-target]').forEach((button) => {
   button.addEventListener('click', async () => {
     const target = document.querySelector(button.dataset.copyTarget);
     if (!target?.value) return;
@@ -76,23 +67,22 @@ copyButtons.forEach((button) => {
   });
 });
 
+function setDefaults() {
+  form.elements.namedItem('start_time').value = '10:00';
+  form.elements.namedItem('end_time').value = '17:00';
+  form.elements.namedItem('slot_minutes').value = '60';
+}
+
 function renderPreview() {
-  const slots = buildSlots(readMeetingForm());
-  const groups = groupSlotsByDate(slots);
-
-  if (groups.length === 0) {
-    preview.innerHTML = '<p class="empty-text">請選擇有效日期區間。</p>';
-    return;
-  }
-
-  preview.innerHTML = groups.map((group) => `
+  const groups = groupSlotsByDate(buildSlots(readMeetingForm()));
+  preview.innerHTML = groups.length ? groups.map((group) => `
     <article class="day-card">
       <h3>${group.date} <span>${group.slots[0].weekday}</span></h3>
       <div class="slot-list">
         ${group.slots.map((slot) => `<span class="slot-chip">${slot.start_time}-${slot.end_time}</span>`).join('')}
       </div>
     </article>
-  `).join('');
+  `).join('') : '<p class="empty-text">請選擇有效日期區間。</p>';
 }
 
 function readMeetingForm() {
@@ -109,8 +99,26 @@ function readMeetingForm() {
     include_saturday: data.get('include_saturday') === 'on',
     include_sunday: data.get('include_sunday') === 'on',
     response_deadline: clean(data.get('response_deadline')),
-    extra_json: '{}',
   };
+}
+
+function saveRecentMeeting(entry) {
+  let entries = [];
+  try {
+    entries = JSON.parse(localStorage.getItem('scheduleAMeeting.recent.v1') || '[]');
+  } catch {
+    entries = [];
+  }
+  localStorage.setItem('scheduleAMeeting.recent.v1', JSON.stringify([
+    entry,
+    ...entries.filter((item) => item.meetingId !== entry.meetingId),
+  ].slice(0, 20)));
+}
+
+function firebaseErrorMessage(error, fallback) {
+  if (error?.code === 'auth/admin-restricted-operation') return 'Firebase 匿名驗證尚未啟用。';
+  if (error?.code === 'PERMISSION_DENIED') return 'Firebase 安全規則拒絕了這次操作。';
+  return error?.message || fallback;
 }
 
 function clean(value) {

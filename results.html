@@ -9,7 +9,7 @@
   <body>
     <div id="config-error" class="config-error hidden">
       <h1>結果頁連結不完整</h1>
-      <p>請回首頁重新輸入 Google 設定與 meeting_id。</p>
+      <p>網址缺少 meeting_id，請向發起人索取完整連結。</p>
       <a class="primary-btn as-link" href="./index.html">回首頁</a>
     </div>
 
@@ -20,7 +20,6 @@
           <h1>會議可行時段</h1>
         </div>
         <div class="actions">
-          <button id="refresh-results" class="ghost-btn" type="button">重新同步</button>
           <span id="sync-status" class="sync-pill">尚未同步</span>
         </div>
       </header>
@@ -31,6 +30,18 @@
           <label><span>參加者連結</span><textarea id="participant-link" rows="3" readonly></textarea></label>
           <div id="qr-code" class="qr-code"></div>
         </div>
+      </section>
+
+      <section class="panel admin-panel">
+        <div class="section-heading">
+          <p class="eyebrow">管理權限</p>
+          <h2>輸入六位數管理密鑰</h2>
+        </div>
+        <form id="admin-form" class="admin-form">
+          <label><span>管理密鑰（不會寫入網址）</span><input name="admin_key" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="off" /></label>
+          <button class="primary-btn" type="submit">解鎖修改功能</button>
+        </form>
+        <p id="admin-status" class="status-line">未解鎖時仍可查看統計，但不能修改最終時間。</p>
       </section>
 
       <section class="panel">

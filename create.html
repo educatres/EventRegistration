@@ -7,13 +7,7 @@
     <link rel="stylesheet" href="./css/styles.css" />
   </head>
   <body>
-    <div id="config-error" class="config-error hidden">
-      <h1>Google 設定不完整</h1>
-      <p>請先回首頁儲存 Google Form 與 Google Sheet 中繼資料。</p>
-      <a class="primary-btn as-link" href="./index.html">回首頁</a>
-    </div>
-
-    <main id="create-app" class="shell hidden">
+    <main id="create-app" class="shell">
       <header class="page-header">
         <div>
           <p class="eyebrow">建立調查</p>
@@ -61,12 +55,16 @@
         <div class="result-layout">
           <div>
             <label><span>meeting_id</span><input id="meeting-id-output" readonly /></label>
+            <label><span>六位數管理密鑰（不在連結中）</span><input id="admin-key-output" class="secret-output" readonly /></label>
+            <label><span>Firebase 自動清除時間</span><input id="expiry-output" readonly /></label>
             <label><span>參加者連結</span><textarea id="respond-link" rows="3" readonly></textarea></label>
             <label><span>結果頁連結</span><textarea id="results-link" rows="3" readonly></textarea></label>
             <div class="actions">
               <button class="primary-btn" type="button" data-copy-target="#respond-link">複製參加者連結</button>
               <button class="ghost-btn" type="button" data-copy-target="#results-link">複製結果頁連結</button>
+              <button class="ghost-btn" type="button" data-copy-target="#admin-key-output">複製管理密鑰</button>
             </div>
+            <p class="muted-text">修改最終時間時，必須同時具備結果連結與這組密鑰。請分開保存。</p>
           </div>
           <div id="qr-code" class="qr-code"></div>
         </div>

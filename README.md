@@ -1,89 +1,83 @@
-# 會議時間調查系統
+# schedule-a-meeting
 
-![會議時間調查系統介紹](./Intro.png)
+以 Firebase Realtime Database 建置的開源會議時間調查工具，可直接部署到 GitHub Pages。
 
-直接使用：https://educatres.github.io/meeting-time-survey-system/
-
-這是一個可部署在 GitHub Pages 的會議時間調查工具。系統不需要自有後端、不使用 Google Apps Script，也不要求 Google OAuth；資料透過 Google Form 寫入，並從公開檢視權限的 Google Sheet 讀取 event log 來還原會議設定、參加者回覆與統計結果。
+正式網站：<https://educatres.github.io/schedule-a-meeting/>
 
 ## 功能
 
-安排多人會議時間，常常比想像中麻煩。使用一般線上調查工具，可能會遇到廣告或功能限制；使用 LINE 投票，又需要逐一建立每個日期與時段，而且並非所有與會者都互加 LINE，後續整理結果也不方便。
-這套完全開源、無廣告的會議時間調查系統，讓發起人可以快速建立可選時段，並透過網址或 QR Code 分享給與會者，輕鬆彙整大家可以參加的時間。
-所有調查資料都只會儲存在發起人自己的 Google Sheet 中，不會另外上傳到其他伺服器，使用上更安心。您可以直接使用我們分享的線上版本，也可以將完整程式碼複製到自己的 GitHub 帳號，自行部署、修改與擴充；無論直接使用或二次開發，都非常歡迎。
+- 發起人設定日期區間、每日時段、週末與回覆截止時間。
+- 建立後產生參加者連結、結果連結與獨立的六位數管理密鑰。
+- 參加者只需要連結即可輸入姓名、可行時間與備註，不需要密鑰。
+- 同一個標準化姓名再次送出時，直接覆蓋舊回覆，以最後一次為準。
+- 統計頁即時同步，顯示全員可行時段、推薦時段與參加者明細。
+- 設定最終時間等修改操作，必須先輸入正確的六位數管理密鑰。
+- 每個會議建立 21 天後，安全規則立即禁止存取；GitHub Actions 每 30 分鐘清除到期資料。
 
-1. 發起人設定日期區間。
-2. 系統自動產生每天七個一小時時段。
-3. 與會者可一次勾選多個時段。
-4. 同一參加者再次填寫時，以最新回覆為準。
-5. 結果頁自動計算全員可行及最多人可行的時間。
-6. 不使用登入與後端，因此需清楚提示公開資料與身份辨識限制。
+## Firebase 專案
 
-## 頁面
+- 顯示名稱：`schedule-a-meeting`
+- Project ID：`schedule-a-meeting-tw`（`schedule-a-meeting` 已被其他 Firebase 使用者占用）
+- Realtime Database：`schedule-a-meeting-tw-default-rtdb`
+- 區域：`asia-southeast1`
+- 驗證：Anonymous Authentication
 
-```text
-index.html    Google Form / Google Sheet 中繼資料設定
-create.html   建立會議調查
-respond.html  參加者填寫可參加時間
-results.html  發起人查看統計與設定最終時間
-```
+Firebase Web App 設定放在 `js/firebase-config.js`。Web API key 是 Firebase 用戶端公開識別設定；安全性由 Authentication 與 `database.rules.json` 控制，儲存庫中不含服務帳號金鑰。
 
-## Google Form 欄位
-
-請建立 Google Form，欄位建議全部使用簡答或段落，並依照下列欄位名稱設定：
+## 資料結構
 
 ```text
-meeting_id
-event_type
-meeting_title
-meeting_description
-organizer_name
-start_date
-end_date
-start_time
-end_time
-slot_minutes
-include_saturday
-include_sunday
-response_deadline
-participant_name
-participant_id
-availability_json
-note
-selected_final_slot
-client_timestamp
-extra_json
+meetings/{meetingId}/
+  settings/
+    title, description, organizer_name
+    start_date, end_date, start_time, end_time, slot_minutes
+    include_saturday, include_sunday, response_deadline
+    status, selected_final_slot
+    created_at, expires_at, created_by
+  responses/{sha256(normalizedName)}/
+    participant_name, name_key, availability, note, updated_at, updated_by
+
+meetingCatalog/{meetingId}/
+  meeting_id, created_at, expires_at
+
+adminKeys/{meetingId}: "123456"
+adminKeyClaims/{meetingId}/{anonymousUid}: "123456"
 ```
 
-建立表單後，將回應連結到 Google Sheet，並把 Sheet 權限設為「知道連結的人可以檢視」。
+管理密鑰不放入分享網址，也不允許從資料庫讀取。瀏覽器只有在提交的六位數密鑰與 `adminKeys` 相符時，才能寫入自己的 claim；管理寫入同時驗證 claim 與原始密鑰。
 
-## 使用方式
+## 三週自動清除
 
-1. 打開 `index.html`。
-2. 輸入 Google Sheet ID、Sheet 名稱或 gid、Google Form submit URL。
-3. 在 Google Form 使用「取得預填連結」，每題填入對應欄位名稱，貼回首頁自動帶入 entry ID。
-4. 儲存設定後進入 `create.html` 建立調查。
-5. 分享產生的 `respond.html` 連結或 QR Code 給參加者。
-6. 使用 `results.html` 查看統計與設定最終時間。
+`expires_at` 固定為 `created_at + 1814400000` 毫秒（21 天）。到期後：
 
-## 本機預覽
+1. Realtime Database Rules 立即拒絕一般讀寫。
+2. `.github/workflows/cleanup-expired-meetings.yml` 每小時第 17、47 分執行。
+3. `scripts/cleanup-expired.mjs` 使用匿名登入，只能依規則刪除已到期會議、密鑰、claims 與 catalog。
+
+## 本機開發
 
 ```bash
 python3 -m http.server 8080
 ```
 
-然後開啟：
+開啟 <http://localhost:8080/>。Firebase ES modules 不支援直接以 `file://` 開啟。
 
-```text
-http://localhost:8080/
+## 檢查與部署
+
+```bash
+node --check js/config.js
+node --check js/create.js
+node --check js/respond.js
+node --check js/results.js
+node -e "JSON.parse(require('fs').readFileSync('database.rules.json', 'utf8'))"
+firebase deploy --only database --project schedule-a-meeting-tw
 ```
 
-## 重要限制
+GitHub Pages 由 `main` 分支根目錄發布。
 
-- 這是公開匿名工具，請勿收集敏感個資。
-- Google Sheet 設為公開檢視後，知道連結的人可能讀取資料。
-- Google Form URL 若外流，可能被他人送出資料。
-- `no-cors` 寫入無法由前端確認 Google Form 是否真的接收成功，需等待 Sheet 同步判斷。
+## 隱私
+
+這是匿名協作工具，姓名只是使用者自行輸入的識別文字，任何知道連結的人都可以讀取會議與回覆。請勿收集敏感個資。
 
 ## 授權
 
