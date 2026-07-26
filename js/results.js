@@ -171,7 +171,7 @@ async function unlock(key, restored = false) {
 
 function renderSummary() {
   const availability = eventAvailability(eventData);
-  summary.innerHTML = `<div class="section-heading"><p class="eyebrow">${escapeHtml(eventId)}</p><h2>${escapeHtml(eventData.title)}</h2></div><dl><div><dt>主辦人</dt><dd>${escapeHtml(eventData.organizer_name || '未填寫')}</dd></div><div><dt>報名狀態</dt><dd><span class="availability-badge ${availability.state}">${availability.label}</span></dd></div><div><dt>目前人數</dt><dd>${eventData.registration_count}/${eventData.capacity}</dd></div><div><dt>報名期間</dt><dd>${formatDateTime(eventData.registration_start_at)} 至 ${formatDateTime(eventData.registration_end_at)}</dd></div><div><dt>自動刪除</dt><dd>${formatDateTime(eventData.expires_at)}</dd></div></dl><div data-description></div>`;
+  summary.innerHTML = `<div class="section-heading"><p class="eyebrow">${escapeHtml(eventId)}</p><h2>${escapeHtml(eventData.title)}</h2></div><dl><div><dt>活動聯絡人</dt><dd>${escapeHtml(eventData.organizer_name || '未填寫')}</dd></div><div><dt>報名狀態</dt><dd><span class="availability-badge ${availability.state}">${availability.label}</span></dd></div><div><dt>目前人數</dt><dd>${eventData.registration_count}/${eventData.capacity}</dd></div><div><dt>報名期間</dt><dd>${formatDateTime(eventData.registration_start_at)} 至 ${formatDateTime(eventData.registration_end_at)}</dd></div><div><dt>自動刪除</dt><dd>${formatDateTime(eventData.expires_at)}</dd></div></dl><div data-description></div>`;
   renderDescription(summary.querySelector('[data-description]'), eventData.description_content, eventData.description_format);
   const closeButton = document.querySelector('#close-registration');
   if (closeButton) closeButton.disabled = eventData.status === 'closed';

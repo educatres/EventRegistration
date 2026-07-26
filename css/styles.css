@@ -61,8 +61,14 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); box-sha
 .status-line, .muted-text, .empty-text { min-height: 1.4em; color: var(--muted); line-height: 1.6; }
 
 .custom-field-list { display: grid; gap: 10px; }
-.custom-field-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; padding: 12px; border: 1px solid var(--line); border-radius: 7px; background: #fbfdfd; }
+.custom-field-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(130px, .45fr) auto auto; gap: 10px; align-items: end; padding: 12px; border: 1px solid var(--line); border-radius: 7px; background: #fbfdfd; }
 .custom-field-row label { margin: 0; }
+.custom-field-row .field-options { grid-column: 1 / -1; }
+.field-required { display: flex; min-height: 44px; align-items: center; gap: 8px; color: var(--ink); }
+.field-required input, .choice-field input { width: auto; min-height: auto; margin: 0; accent-color: var(--accent); }
+.choice-field { display: grid; gap: 10px; margin: 0 0 14px; border: 1px solid var(--line); border-radius: 7px; padding: 14px; }
+.choice-field legend { padding: 0 6px; color: var(--muted); font-weight: 700; }
+.choice-field label { display: flex; align-items: center; gap: 9px; margin: 0; color: var(--ink); font-weight: 500; }
 .field-list { margin: 14px 0 0; padding-left: 22px; color: var(--muted); line-height: 1.8; }
 .event-preview h2 { margin-bottom: 16px; }
 .description-text { margin-top: 18px; white-space: pre-wrap; line-height: 1.8; }
@@ -121,7 +127,8 @@ th { color: var(--muted); background: #f8faf9; font-size: .8rem; }
   .shell { width: min(100% - 20px, 1180px); padding-top: 18px; }
   .page-header, .inline-heading { align-items: stretch; flex-direction: column; }
   .page-header .actions { margin-top: 0; }
-  .two-col, .admin-form { grid-template-columns: 1fr; }
+  .two-col, .admin-form, .custom-field-row { grid-template-columns: 1fr; }
+  .custom-field-row .field-options { grid-column: auto; }
   .notice { align-items: flex-start; flex-direction: column; }
   .panel { padding: 17px; }
   h1 { font-size: 2rem; }

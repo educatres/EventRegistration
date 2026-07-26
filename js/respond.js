@@ -30,9 +30,17 @@ form?.addEventListener('submit', async (event) => {
 
   const data = new FormData(form);
   const customAnswers = {};
-  customFields().forEach(([fieldId]) => {
-    customAnswers[fieldId] = clean(data.get(`custom_${fieldId}`));
-  });
+  for (const [fieldId, field] of customFields()) {
+    const answers = fieldType(field) === 'checkbox'
+      ? data.getAll(`custom_${fieldId}`).map(clean).filter(Boolean)
+      : [clean(data.get(`custom_${fieldId}`))].filter(Boolean);
+    if (field.required === true && answers.length === 0) {
+      status.textContent = `請填寫必填欄位「${field.label}」。`;
+      form.querySelector(`[name="custom_${fieldId}"]`)?.focus();
+      return;
+    }
+    customAnswers[fieldId] = answers.join(', ');
+  }
   const values = {
     name: clean(data.get('name')),
     email: clean(data.get('email')),
@@ -71,12 +79,21 @@ async function beginSync() {
 }
 
 function renderInfo() {
-  info.innerHTML = `<div class="section-heading"><p class="eyebrow">Event registration</p><h1>${escapeHtml(eventData.title)}</h1></div><dl><div><dt>主辦人</dt><dd>${escapeHtml(eventData.organizer_name || '未填寫')}</dd></div><div><dt>報名期間</dt><dd>${formatDateTime(eventData.registration_start_at)} 至 ${formatDateTime(eventData.registration_end_at)}</dd></div><div><dt>名額</dt><dd>${eventData.registration_count}/${eventData.capacity}</dd></div><div><dt>資料刪除</dt><dd>${formatDateTime(eventData.expires_at)}</dd></div></dl><div data-description></div><p class="availability-badge" data-availability></p>`;
+  info.innerHTML = `<div class="section-heading"><p class="eyebrow">Event registration</p><h1>${escapeHtml(eventData.title)}</h1></div><dl><div><dt>活動聯絡人</dt><dd>${escapeHtml(eventData.organizer_name || '未填寫')}</dd></div><div><dt>報名期間</dt><dd>${formatDateTime(eventData.registration_start_at)} 至 ${formatDateTime(eventData.registration_end_at)}</dd></div><div><dt>名額</dt><dd>${eventData.registration_count}/${eventData.capacity}</dd></div><div><dt>資料刪除</dt><dd>${formatDateTime(eventData.expires_at)}</dd></div></dl><div data-description></div><p class="availability-badge" data-availability></p>`;
   renderDescription(info.querySelector('[data-description]'), eventData.description_content, eventData.description_format);
 }
 
 function renderCustomFields() {
-  customFieldsContainer.innerHTML = customFields().map(([fieldId, field]) => `<label><span>${escapeHtml(field.label)}（選填）</span><input name="custom_${fieldId}" maxlength="500" /></label>`).join('');
+  customFieldsContainer.innerHTML = customFields().map(([fieldId, field]) => renderCustomField(fieldId, field)).join('');
+}
+
+function renderCustomField(fieldId, field) {
+  const type = fieldType(field);
+  const requiredText = field.required === true ? '必填' : '選填';
+  const name = `custom_${fieldId}`;
+  if (type === 'text') return `<label><span>${escapeHtml(field.label)}（${requiredText}）</span><input name="${name}" maxlength="500" ${field.required === true ? 'required' : ''} /></label>`;
+  const options = parseFieldOptions(field);
+  return `<fieldset class="choice-field"><legend>${escapeHtml(field.label)}（${requiredText}）</legend>${options.map((option) => `<label><input name="${name}" type="${type}" value="${escapeHtml(option)}" ${type === 'radio' && field.required === true ? 'required' : ''} /><span>${escapeHtml(option)}</span></label>`).join('')}</fieldset>`;
 }
 
 function renderState() {
@@ -84,13 +101,16 @@ function renderState() {
   const availability = eventAvailability(eventData);
   info.querySelector('[data-availability]').textContent = availability.label;
   info.querySelector('[data-availability]').className = `availability-badge ${availability.state}`;
-  form.querySelectorAll('input, button[type="submit"]').forEach((control) => { control.disabled = !availability.open; });
+  form.querySelectorAll('input, select, textarea, button[type="submit"]').forEach((control) => { control.disabled = !availability.open; });
   if (!status.textContent || status.textContent.startsWith('正在載入')) status.textContent = availability.open ? '請填寫資料完成報名。' : availability.label;
 }
 
 function customFields() {
   return Object.entries(eventData?.custom_fields || {}).sort(([, a], [, b]) => Number(a.order) - Number(b.order));
 }
+
+function fieldType(field) { return ['radio', 'checkbox'].includes(field?.type) ? field.type : 'text'; }
+function parseFieldOptions(field) { return String(field?.options || '').split(',').map(clean).filter(Boolean); }
 
 function handleError(error) {
   status.textContent = error?.message || '無法載入活動。';

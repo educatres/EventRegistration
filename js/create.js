@@ -44,9 +44,21 @@ fieldList?.addEventListener('click', (event) => {
   renderPreview();
 });
 
+fieldList?.addEventListener('change', (event) => {
+  if (!event.target.matches('[data-field-type]')) return;
+  updateFieldRow(event.target.closest('[data-field-row]'));
+  renderPreview();
+});
+
 form?.addEventListener('submit', async (event) => {
   event.preventDefault();
-  const values = readForm();
+  let values;
+  try {
+    values = readForm();
+  } catch (error) {
+    createStatus.textContent = error.message;
+    return;
+  }
   if (values.registration_start_at >= values.registration_end_at) {
     createStatus.textContent = '報名結束時間必須晚於開始時間。';
     return;
@@ -99,16 +111,32 @@ function addFieldRow(value = '') {
   const row = document.createElement('div');
   row.className = 'custom-field-row';
   row.dataset.fieldRow = '';
-  row.innerHTML = `<label><span>欄位名稱</span><input data-field-label maxlength="60" value="${escapeHtml(value)}" placeholder="例如：飲食需求" /></label><button class="ghost-btn small-btn" type="button" data-remove-field>移除</button>`;
+  row.innerHTML = `
+    <label><span>欄位名稱</span><input data-field-label maxlength="60" value="${escapeHtml(value)}" placeholder="例如：飲食需求" /></label>
+    <label><span>欄位類型</span><select data-field-type><option value="text">文字</option><option value="radio">單選</option><option value="checkbox">多選</option></select></label>
+    <label class="field-required"><input data-field-required type="checkbox" /><span>設為必填</span></label>
+    <button class="ghost-btn small-btn" type="button" data-remove-field>移除</button>
+    <label class="field-options hidden"><span>選項（以逗號分隔）</span><input data-field-options maxlength="1000" placeholder="例如：葷食,素食,其他" /></label>`;
   fieldList.append(row);
-  row.querySelector('input').focus();
+  row.querySelector('[data-field-label]').focus();
 }
 
 function readForm() {
   const data = new FormData(form);
   const customFields = {};
-  [...fieldList.querySelectorAll('[data-field-label]')].map((input) => clean(input.value)).filter(Boolean).forEach((label, order) => {
-    customFields[generateFieldId()] = { label, order };
+  [...fieldList.querySelectorAll('[data-field-row]')].forEach((row, order) => {
+    const label = clean(row.querySelector('[data-field-label]').value);
+    if (!label) return;
+    const type = normalizeFieldType(row.querySelector('[data-field-type]').value);
+    const options = parseOptions(row.querySelector('[data-field-options]').value);
+    if (type !== 'text' && options.length < 2) throw new Error(`「${label}」至少需要兩個以逗號分隔的選項。`);
+    customFields[generateFieldId()] = {
+      label,
+      order,
+      type,
+      required: row.querySelector('[data-field-required]').checked,
+      options: type === 'text' ? '' : options.join(','),
+    };
   });
   return {
     title: clean(data.get('event_title')),
@@ -126,10 +154,23 @@ function renderPreview() {
   const data = new FormData(form);
   const title = clean(data.get('event_title')) || '活動名稱';
   const organizer = clean(data.get('organizer_name')) || '未填寫';
-  const labels = [...fieldList.querySelectorAll('[data-field-label]')].map((input) => clean(input.value)).filter(Boolean);
-  preview.innerHTML = `<h2>${escapeHtml(title)}</h2><dl><div><dt>主辦人</dt><dd>${escapeHtml(organizer)}</dd></div><div><dt>人數上限</dt><dd>${escapeHtml(data.get('capacity') || '50')} 人</dd></div></dl><div data-description></div><h3>報名欄位</h3><ul class="field-list"><li>姓名（必填）</li><li>Email（必填）</li><li>電話（選填）</li>${labels.map((label) => `<li>${escapeHtml(label)}（選填）</li>`).join('')}</ul>`;
+  const fields = [...fieldList.querySelectorAll('[data-field-row]')].map((row) => ({
+    label: clean(row.querySelector('[data-field-label]').value),
+    type: normalizeFieldType(row.querySelector('[data-field-type]').value),
+    required: row.querySelector('[data-field-required]').checked,
+  })).filter((field) => field.label);
+  preview.innerHTML = `<h2>${escapeHtml(title)}</h2><dl><div><dt>活動聯絡人</dt><dd>${escapeHtml(organizer)}</dd></div><div><dt>人數上限</dt><dd>${escapeHtml(data.get('capacity') || '50')} 人</dd></div></dl><div data-description></div><h3>報名欄位</h3><ul class="field-list"><li>姓名（必填）</li><li>Email（必填）</li><li>電話（選填）</li>${fields.map((field) => `<li>${escapeHtml(field.label)}（${field.required ? '必填' : '選填'}，${fieldTypeLabel(field.type)}）</li>`).join('')}</ul>`;
   renderDescription(preview.querySelector('[data-description]'), clean(data.get('description_content')), data.get('description_format'));
 }
+
+function updateFieldRow(row) {
+  const isChoice = normalizeFieldType(row.querySelector('[data-field-type]').value) !== 'text';
+  row.querySelector('.field-options').classList.toggle('hidden', !isChoice);
+}
+
+function normalizeFieldType(value) { return ['radio', 'checkbox'].includes(value) ? value : 'text'; }
+function fieldTypeLabel(type) { return ({ text: '文字', radio: '單選', checkbox: '多選' })[type] || '文字'; }
+function parseOptions(value) { return [...new Set(String(value || '').split(',').map(clean).filter(Boolean))]; }
 
 function firebaseErrorMessage(error, fallback) {
   if (error?.code === 'auth/admin-restricted-operation') return 'Firebase 匿名驗證尚未啟用。';

@@ -16,7 +16,7 @@
       <div class="layout-grid">
         <form id="event-form" class="panel">
           <label><span>活動名稱 <b>*</b></span><input name="event_title" maxlength="200" required /></label>
-          <label><span>主辦人名稱</span><input name="organizer_name" maxlength="100" /></label>
+          <label><span>活動聯絡人</span><input name="organizer_name" maxlength="100" /></label>
           <div class="two-col description-controls">
             <label><span>說明格式</span><select name="description_format"><option value="text">純文字</option><option value="html">HTML（安全標籤）</option></select></label>
             <p class="muted-text">HTML 支援標題、段落、清單、粗斜體與連結；危險標籤會被移除。</p>
@@ -34,7 +34,7 @@
               <div><p class="eyebrow">Custom fields</p><h2>自訂欄位</h2></div>
               <button id="add-field" class="ghost-btn small-btn" type="button">新增欄位</button>
             </div>
-            <p class="muted-text">姓名與 Email 固定必填，電話固定選填；這裡可再加入最多 20 個選填文字欄位。</p>
+            <p class="muted-text">姓名與 Email 固定必填，電話固定選填；這裡可再加入最多 20 個文字、單選或多選欄位。</p>
             <div id="custom-field-list" class="custom-field-list"></div>
           </section>
 

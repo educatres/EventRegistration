@@ -48,7 +48,7 @@
           },
           "custom_fields": {
             "$fieldId": {
-              ".validate": "$fieldId.matches(/^f_[a-z0-9]{8}$/) && newData.hasChildren(['label', 'order']) && newData.child('label').isString() && newData.child('label').val().length > 0 && newData.child('label').val().length <= 60 && newData.child('order').isNumber() && newData.child('order').val() >= 0 && newData.child('order').val() < 20"
+              ".validate": "$fieldId.matches(/^f_[a-z0-9]{8}$/) && newData.hasChildren(['label', 'order']) && newData.child('label').isString() && newData.child('label').val().length > 0 && newData.child('label').val().length <= 60 && newData.child('order').isNumber() && newData.child('order').val() >= 0 && newData.child('order').val() < 20 && (!newData.child('type').exists() || (newData.child('type').isString() && newData.child('type').val().matches(/^(text|radio|checkbox)$/))) && (!newData.child('required').exists() || newData.child('required').isBoolean()) && (!newData.child('options').exists() || (newData.child('options').isString() && newData.child('options').val().length <= 1000))"
             }
           }
         },
@@ -59,7 +59,7 @@
             ".validate": "newData.hasChildren(['name', 'email', 'phone', 'custom_answers', 'submitted_at', 'submitted_by']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 100 && newData.child('email').isString() && newData.child('email').val().length > 3 && newData.child('email').val().length <= 254 && newData.child('email').val().matches(/^[^@ ]+@[^@ ]+\\.[^@ ]+$/) && newData.child('phone').isString() && newData.child('phone').val().length <= 50 && newData.child('submitted_at').isNumber() && newData.child('submitted_at').val() >= now - 600000 && newData.child('submitted_at').val() <= now + 600000 && newData.child('submitted_by').val() === auth.uid",
             "custom_answers": {
               "$fieldId": {
-                ".validate": "($fieldId === '_placeholder' && newData.val() === '') || (root.child('events').child($eventId).child('public').child('custom_fields').child($fieldId).exists() && newData.isString() && newData.val().length <= 500)"
+                ".validate": "($fieldId === '_placeholder' && newData.val() === '') || (root.child('events').child($eventId).child('public').child('custom_fields').child($fieldId).exists() && newData.isString() && newData.val().length <= 500 && (root.child('events').child($eventId).child('public').child('custom_fields').child($fieldId).child('required').val() !== true || newData.val().length > 0))"
               }
             }
           }
