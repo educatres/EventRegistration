@@ -1,10 +1,13 @@
 import { buildMeetingUrl, parseMeetingReference } from './config.js';
+import { getMeeting, isMeetingUnavailableError } from './firebase-store.js';
+import { clearAllLocalMeetingData, readRecentMeetings, writeRecentMeetings } from './local-meetings.js';
 
 const openForm = document.querySelector('#open-meeting-form');
 const recentList = document.querySelector('#recent-meetings');
 const clearButton = document.querySelector('#clear-recent');
 
 renderRecentMeetings();
+synchronizeRecentMeetings();
 
 openForm?.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -14,9 +17,30 @@ openForm?.addEventListener('submit', (event) => {
 });
 
 clearButton?.addEventListener('click', () => {
-  localStorage.removeItem('scheduleAMeeting.recent.v1');
+  clearAllLocalMeetingData();
   renderRecentMeetings();
 });
+
+async function synchronizeRecentMeetings() {
+  const entries = readRecentMeetings();
+  if (entries.length === 0) return;
+
+  const synchronized = await Promise.all(entries.map(async (entry) => {
+    try {
+      const record = await getMeeting(entry.meetingId);
+      return {
+        ...entry,
+        title: record.settings?.title || entry.title,
+        expiresAt: record.settings?.expires_at || entry.expiresAt,
+      };
+    } catch (error) {
+      return isMeetingUnavailableError(error) ? null : entry;
+    }
+  }));
+
+  writeRecentMeetings(synchronized.filter(Boolean));
+  renderRecentMeetings();
+}
 
 function renderRecentMeetings() {
   const meetings = readRecentMeetings();
@@ -32,14 +56,6 @@ function renderRecentMeetings() {
       </li>
     `).join('')
     : '<li class="empty-text">這個瀏覽器尚未建立任何會議。</li>';
-}
-
-function readRecentMeetings() {
-  try {
-    return JSON.parse(localStorage.getItem('scheduleAMeeting.recent.v1') || '[]');
-  } catch {
-    return [];
-  }
 }
 
 function escapeHtml(value) {

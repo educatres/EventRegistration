@@ -1,8 +1,9 @@
 import { buildMeetingUrl, getMeetingId } from './config.js';
-import { claimAdminKey, subscribeMeeting, updateMeetingSettings } from './firebase-store.js';
+import { claimAdminKey, isMeetingUnavailableError, subscribeMeeting, updateMeetingSettings } from './firebase-store.js';
 import { buildSlots, formatSlotKey, groupSlotsByDate } from './calendar.js';
 import { buildSlotStatistics, getRecommendedSlots, meetingFromRecord, responsesFromRecord } from './meeting-store.js';
 import { renderQr } from './qr.js';
+import { getLocalAdminKey, removeLocalMeeting } from './local-meetings.js';
 
 const meetingId = getMeetingId();
 const configError = document.querySelector('#config-error');
@@ -71,17 +72,16 @@ async function beginSync() {
       renderAll();
       status.textContent = `即時同步：${new Date().toLocaleTimeString('zh-TW')}`;
     }, (error) => {
-      status.textContent = error?.message || '同步失敗。';
+      handleSyncError(error);
     });
   } catch (error) {
-    status.textContent = error?.message || '無法連線 Firebase。';
+    handleSyncError(error);
   }
 }
 
 async function restoreLocalAdminKey() {
   try {
-    const entries = JSON.parse(localStorage.getItem('scheduleAMeeting.recent.v1') || '[]');
-    const key = entries.find((item) => item.meetingId === meetingId)?.adminKey;
+    const key = getLocalAdminKey(meetingId);
     if (!key) return;
     adminForm.elements.namedItem('admin_key').value = key;
     await claimAdminKey(meetingId, key);
@@ -91,6 +91,27 @@ async function restoreLocalAdminKey() {
   } catch {
     // 本機記錄可能已過期或被修改，維持唯讀即可。
   }
+}
+
+function handleSyncError(error) {
+  status.textContent = error?.message || '同步失敗。';
+  if (!isMeetingUnavailableError(error)) return;
+
+  removeLocalMeeting(meetingId);
+  meeting = undefined;
+  responses = [];
+  statistics = [];
+  adminUnlocked = false;
+  info.innerHTML = '<h1>會議已不存在</h1><p>Firebase 資料已刪除或到期，本機會議記錄與草稿也已清除。</p>';
+  statsGrid.replaceChildren();
+  participantTable.replaceChildren();
+  recommendations.replaceChildren();
+  finalPanel.innerHTML = '<p class="empty-text">沒有可顯示的 Firebase 資料。</p>';
+  participantLink.value = '';
+  qrCode.replaceChildren();
+  adminForm.elements.namedItem('admin_key').value = '';
+  adminForm.querySelector('button[type="submit"]').disabled = true;
+  adminStatus.textContent = 'Firebase 會議已不存在，管理功能已停用。';
 }
 
 function renderAll() {

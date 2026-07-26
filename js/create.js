@@ -1,5 +1,6 @@
 import { buildMeetingUrl, generateAdminKey, generateMeetingId } from './config.js';
 import { createMeeting, ensureAuth } from './firebase-store.js';
+import { saveRecentMeeting } from './local-meetings.js';
 import { buildSlots, groupSlotsByDate } from './calendar.js';
 import { renderQr } from './qr.js';
 
@@ -100,19 +101,6 @@ function readMeetingForm() {
     include_sunday: data.get('include_sunday') === 'on',
     response_deadline: clean(data.get('response_deadline')),
   };
-}
-
-function saveRecentMeeting(entry) {
-  let entries = [];
-  try {
-    entries = JSON.parse(localStorage.getItem('scheduleAMeeting.recent.v1') || '[]');
-  } catch {
-    entries = [];
-  }
-  localStorage.setItem('scheduleAMeeting.recent.v1', JSON.stringify([
-    entry,
-    ...entries.filter((item) => item.meetingId !== entry.meetingId),
-  ].slice(0, 20)));
 }
 
 function firebaseErrorMessage(error, fallback) {

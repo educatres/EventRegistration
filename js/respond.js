@@ -1,7 +1,7 @@
 import { getMeetingId } from './config.js';
-import { getMeeting, submitResponse } from './firebase-store.js';
+import { isMeetingUnavailableError, submitResponse, subscribeMeetingSettings } from './firebase-store.js';
 import { buildSlots, groupSlotsByDate, isPastDeadline, summarizeAvailability } from './calendar.js';
-import { meetingFromRecord } from './meeting-store.js';
+import { readMeetingDraft, removeLocalMeeting, saveMeetingDraft } from './local-meetings.js';
 
 const meetingId = getMeetingId();
 const configError = document.querySelector('#config-error');
@@ -15,6 +15,7 @@ const status = document.querySelector('#response-status');
 let meeting;
 let slots = [];
 let selected = new Set();
+let initialized = false;
 
 if (!meetingId) {
   configError.classList.remove('hidden');
@@ -38,9 +39,9 @@ form?.addEventListener('submit', async (event) => {
 
   try {
     await submitResponse(meetingId, participantName, Array.from(selected), note);
-    localStorage.setItem(`scheduleAMeeting.draft:${meetingId}`, JSON.stringify({
+    saveMeetingDraft(meetingId, {
       participantName, note, availability: Array.from(selected),
-    }));
+    });
     status.textContent = `已儲存 ${participantName} 的最新回覆，共 ${selected.size} 個時段。若同名再次送出，會覆蓋這筆資料。`;
   } catch (error) {
     status.textContent = error?.message || '送出失敗，請稍後再試。';
@@ -63,27 +64,39 @@ document.querySelectorAll('[data-quick]').forEach((button) => {
 async function loadMeeting() {
   status.textContent = '正在從 Firebase 讀取會議...';
   try {
-    meeting = meetingFromRecord(await getMeeting(meetingId));
-    slots = buildSlots(meeting);
-    restoreDraft();
-    renderInfo();
-    renderSlots();
-    status.textContent = '會議已載入；填寫不需要管理密鑰。';
+    await subscribeMeetingSettings(meetingId, (settings) => {
+      meeting = settings;
+      slots = buildSlots(meeting);
+      if (!initialized) restoreDraft();
+      initialized = true;
+      renderInfo();
+      renderSlots();
+      status.textContent = '已與 Firebase 同步；填寫不需要管理密鑰。';
+    }, handleMeetingError);
   } catch (error) {
-    status.textContent = error?.message || '無法載入會議。';
-    form.querySelector('button[type="submit"]').disabled = true;
+    handleMeetingError(error);
   }
 }
 
 function restoreDraft() {
-  try {
-    const draft = JSON.parse(localStorage.getItem(`scheduleAMeeting.draft:${meetingId}`) || '{}');
-    if (draft.participantName) form.elements.namedItem('participant_name').value = draft.participantName;
-    if (draft.note) form.elements.namedItem('note').value = draft.note;
-    selected = new Set((draft.availability || []).filter((key) => slots.some((slot) => slot.key === key)));
-  } catch {
-    selected = new Set();
-  }
+  const draft = readMeetingDraft(meetingId);
+  if (draft.participantName) form.elements.namedItem('participant_name').value = draft.participantName;
+  if (draft.note) form.elements.namedItem('note').value = draft.note;
+  selected = new Set((draft.availability || []).filter((key) => slots.some((slot) => slot.key === key)));
+}
+
+function handleMeetingError(error) {
+  status.textContent = error?.message || '無法載入會議。';
+  form.querySelector('button[type="submit"]').disabled = true;
+  if (!isMeetingUnavailableError(error)) return;
+
+  removeLocalMeeting(meetingId);
+  meeting = undefined;
+  slots = [];
+  selected.clear();
+  info.innerHTML = '<h1>會議已不存在</h1><p>Firebase 資料已刪除或到期，本機草稿與會議記錄也已清除。</p>';
+  slotGrid.replaceChildren();
+  summary.replaceChildren();
 }
 
 function renderInfo() {
@@ -97,9 +110,8 @@ function renderInfo() {
     </dl>
     ${meeting.description ? `<p>${escapeHtml(meeting.description)}</p>` : ''}
   `;
-  if (meeting.status !== 'open' || isPastDeadline(meeting.response_deadline)) {
-    form.querySelector('button[type="submit"]').disabled = true;
-  }
+  form.querySelector('button[type="submit"]').disabled = meeting.status !== 'open'
+    || isPastDeadline(meeting.response_deadline);
 }
 
 function renderSlots() {

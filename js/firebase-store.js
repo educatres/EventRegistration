@@ -73,7 +73,7 @@ export async function createMeeting(meetingId, adminKey, meeting) {
 export async function getMeeting(meetingId) {
   await ensureAuth();
   const snapshot = await get(ref(database, `meetings/${meetingId}`));
-  if (!snapshot.exists()) throw new Error('找不到這個會議，或資料已在三週到期後清除。');
+  if (!snapshot.exists()) throw createMeetingUnavailableError();
   return { meeting_id: meetingId, ...snapshot.val() };
 }
 
@@ -81,11 +81,31 @@ export async function subscribeMeeting(meetingId, onData, onError) {
   await ensureAuth();
   return onValue(ref(database, `meetings/${meetingId}`), (snapshot) => {
     if (!snapshot.exists()) {
-      onError?.(new Error('找不到這個會議，或資料已在三週到期後清除。'));
+      onError?.(createMeetingUnavailableError());
       return;
     }
     onData({ meeting_id: meetingId, ...snapshot.val() });
   }, onError);
+}
+
+export async function subscribeMeetingSettings(meetingId, onData, onError) {
+  await ensureAuth();
+  return onValue(ref(database, `meetings/${meetingId}/settings`), (snapshot) => {
+    if (!snapshot.exists()) {
+      onError?.(createMeetingUnavailableError());
+      return;
+    }
+    onData({ meeting_id: meetingId, ...snapshot.val() });
+  }, onError);
+}
+
+export function isMeetingUnavailableError(error) {
+  const code = String(error?.code || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  return code === 'meeting_not_found'
+    || code.includes('permission_denied')
+    || code.includes('permission-denied')
+    || message.includes('permission denied');
 }
 
 export async function submitResponse(meetingId, participantName, availability, note) {
@@ -140,4 +160,10 @@ export async function deleteMeeting(meetingId) {
     [`adminKeyClaims/${meetingId}`]: null,
     [`meetingCatalog/${meetingId}`]: null,
   });
+}
+
+function createMeetingUnavailableError() {
+  const error = new Error('找不到這個會議，或資料已在三週到期後清除。');
+  error.code = 'MEETING_NOT_FOUND';
+  return error;
 }

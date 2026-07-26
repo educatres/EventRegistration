@@ -29,7 +29,7 @@
     },
     "meetings": {
       "$meetingId": {
-        ".read": "auth != null && data.child('settings').child('expires_at').isNumber() && data.child('settings').child('expires_at').val() > now",
+        ".read": "auth != null && (!data.exists() || (data.child('settings').child('expires_at').isNumber() && data.child('settings').child('expires_at').val() > now))",
         ".write": "auth != null && !newData.exists() && ((data.child('settings').child('expires_at').isNumber() && data.child('settings').child('expires_at').val() <= now) || (root.child('adminKeys').child($meetingId).isString() && root.child('adminKeyClaims').child($meetingId).child(auth.uid).val() === root.child('adminKeys').child($meetingId).val()))",
         "settings": {
           ".write": "auth != null && root.child('adminKeys').child($meetingId).isString() && root.child('adminKeyClaims').child($meetingId).child(auth.uid).val() === root.child('adminKeys').child($meetingId).val() && ((!data.exists() && newData.child('created_by').val() === auth.uid) || data.exists())",
