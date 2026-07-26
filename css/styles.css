@@ -381,7 +381,8 @@ select:focus {
   gap: 12px;
 }
 
-#stats-grid {
+#stats-grid,
+#slot-grid {
   display: flex;
   align-items: flex-start;
   overflow-x: auto;
@@ -393,7 +394,8 @@ select:focus {
   -webkit-overflow-scrolling: touch;
 }
 
-#stats-grid .day-card {
+#stats-grid .day-card,
+#slot-grid .day-card {
   width: 200px;
   min-width: 200px;
   flex: 0 0 200px;
@@ -403,6 +405,15 @@ select:focus {
 
 #stats-grid .slot-list.vertical {
   grid-template-columns: 1fr;
+}
+
+#slot-grid .slot-list {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+#slot-grid .slot-button {
+  width: 100%;
 }
 
 #stats-grid .stat-slot {
