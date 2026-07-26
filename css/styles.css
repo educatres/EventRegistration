@@ -84,6 +84,20 @@ dd { margin: 4px 0 0; overflow-wrap: anywhere; font-weight: 700; }
 .admin-form { display: grid; grid-template-columns: minmax(220px, 360px) max-content; gap: 12px; align-items: end; }
 .admin-form label { margin: 0; }
 .danger-panel { border-color: #efd1d1; }
+.deletion-countdown-panel { display: flex; gap: 24px; align-items: center; justify-content: space-between; border-color: var(--accent-soft); background: linear-gradient(135deg, #fff 0%, var(--surface-soft) 100%); }
+.deletion-countdown-panel .muted-text { margin: 8px 0 0; }
+.deletion-countdown { color: var(--accent-strong); font-size: clamp(1.25rem, 3vw, 2rem); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.deletion-countdown.expired { color: var(--danger); }
+
+.system-events-trigger { position: fixed; right: 14px; bottom: 14px; z-index: 20; width: 38px; height: 38px; border: 0; border-radius: 50%; padding: 0; background: rgba(32, 37, 43, .08); opacity: .28; filter: grayscale(1); font-size: 1rem; transition: opacity .16s ease, background .16s ease, transform .16s ease; }
+.system-events-trigger:hover, .system-events-trigger:focus-visible { background: rgba(20, 108, 100, .14); opacity: .78; filter: none; transform: translateY(-1px); }
+.system-events-dialog { width: min(760px, calc(100% - 28px)); max-height: min(78vh, 720px); border: 1px solid var(--line); border-radius: 10px; padding: 22px; color: var(--ink); background: var(--surface); box-shadow: 0 24px 70px rgba(27, 38, 49, .24); }
+.system-events-dialog::backdrop { background: rgba(20, 29, 36, .32); backdrop-filter: blur(2px); }
+.dialog-header { display: flex; gap: 18px; align-items: flex-start; justify-content: space-between; }
+.system-events-table-wrap { max-height: 52vh; margin-top: 16px; }
+.system-events-table-wrap code { color: var(--accent-strong); font-weight: 800; }
+.catalog-state { display: inline-flex; border-radius: 999px; padding: 4px 9px; color: var(--accent-strong); background: var(--accent-soft); font-size: .8rem; font-weight: 800; white-space: nowrap; }
+.catalog-state.expired { color: #7b2929; background: #f8dede; }
 
 .recent-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .recent-list li { display: flex; gap: 12px; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: 7px; padding: 12px; }
@@ -108,4 +122,7 @@ th { color: var(--muted); background: #f8faf9; font-size: .8rem; }
   .notice { align-items: flex-start; flex-direction: column; }
   .panel { padding: 17px; }
   h1 { font-size: 2rem; }
+  .deletion-countdown-panel { align-items: flex-start; flex-direction: column; }
+  .deletion-countdown { white-space: normal; }
+  .system-events-dialog { padding: 17px; }
 }

@@ -3,7 +3,7 @@
     ".read": false,
     ".write": false,
     "eventCatalog": {
-      ".read": false,
+      ".read": "auth != null",
       ".indexOn": ["expires_at"],
       "$eventId": {
         ".write": "auth != null && !data.exists() && newData.exists() && root.child('events').child($eventId).child('public').child('created_by').val() === auth.uid",

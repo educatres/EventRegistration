@@ -1,10 +1,16 @@
-import { buildEventUrl, parseEventReference } from './config.js';
-import { getEventPublic, isEventUnavailableError } from './firebase-store.js';
+import { buildEventUrl, formatDateTime, parseEventReference } from './config.js';
+import { getEventCatalog, getEventPublic, isEventUnavailableError } from './firebase-store.js';
 import { clearRecentEvents, readRecentEvents, removeLocalEvent, writeRecentEvents } from './local-events.js';
 
 const openForm = document.querySelector('#open-event-form');
 const recentList = document.querySelector('#recent-events');
 const clearButton = document.querySelector('#clear-recent');
+const systemEventsTrigger = document.querySelector('#system-events-trigger');
+const systemEventsDialog = document.querySelector('#system-events-dialog');
+const systemEventsClose = document.querySelector('#system-events-close');
+const systemEventsRefresh = document.querySelector('#system-events-refresh');
+const systemEventsStatus = document.querySelector('#system-events-status');
+const systemEventsBody = document.querySelector('#system-events-body');
 
 renderRecentEvents();
 synchronizeRecentEvents();
@@ -20,6 +26,34 @@ clearButton?.addEventListener('click', () => {
   clearRecentEvents();
   renderRecentEvents();
 });
+
+systemEventsTrigger?.addEventListener('click', () => {
+  systemEventsDialog.showModal();
+  loadSystemEvents();
+});
+
+systemEventsClose?.addEventListener('click', () => systemEventsDialog.close());
+systemEventsRefresh?.addEventListener('click', loadSystemEvents);
+systemEventsDialog?.addEventListener('click', (event) => {
+  if (event.target === systemEventsDialog) systemEventsDialog.close();
+});
+
+async function loadSystemEvents() {
+  systemEventsStatus.textContent = '正在讀取 Firebase...';
+  systemEventsBody.innerHTML = '<tr><td colspan="3" class="muted-text">載入中...</td></tr>';
+  try {
+    const now = Date.now();
+    const events = (await getEventCatalog()).sort((a, b) => Number(a.expires_at) - Number(b.expires_at));
+    systemEventsBody.innerHTML = events.length ? events.map((event) => {
+      const expired = Number(event.expires_at) <= now;
+      return `<tr><td><code>${escapeHtml(event.event_id)}</code></td><td>${formatDateTime(event.expires_at)}</td><td><span class="catalog-state ${expired ? 'expired' : ''}">${expired ? '已到期，等待清除' : '有效'}</span></td></tr>`;
+    }).join('') : '<tr><td colspan="3" class="empty-text">Firebase 目前沒有活動。</td></tr>';
+    systemEventsStatus.textContent = `共 ${events.length} 筆，更新於 ${new Date().toLocaleTimeString('zh-TW')}`;
+  } catch (error) {
+    systemEventsBody.innerHTML = '<tr><td colspan="3" class="empty-text">無法讀取活動索引。</td></tr>';
+    systemEventsStatus.textContent = error?.message || '讀取失敗。';
+  }
+}
 
 async function synchronizeRecentEvents() {
   const entries = readRecentEvents();

@@ -88,6 +88,16 @@ export async function getEventPublic(eventId) {
   return { event_id: eventId, ...snapshot.val() };
 }
 
+export async function getEventCatalog() {
+  await ensureAuth();
+  const snapshot = await get(ref(database, 'eventCatalog'));
+  if (!snapshot.exists()) return [];
+  return Object.entries(snapshot.val()).map(([eventId, entry]) => ({
+    ...entry,
+    event_id: entry.event_id || eventId,
+  }));
+}
+
 export async function subscribeEventPublic(eventId, onData, onError) {
   await ensureAuth();
   return onValue(ref(database, `events/${eventId}/public`), (snapshot) => {

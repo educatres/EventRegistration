@@ -13,6 +13,8 @@ const adminStatus = document.querySelector('#admin-status');
 const adminContent = document.querySelector('#admin-content');
 const scheduleForm = document.querySelector('#schedule-form');
 const table = document.querySelector('#registration-table');
+const deletionDate = document.querySelector('#deletion-date');
+const deletionCountdown = document.querySelector('#deletion-countdown');
 let eventData;
 let registrations = [];
 let adminUnlocked = false;
@@ -23,6 +25,7 @@ if (!eventId) {
 } else {
   app.classList.remove('hidden');
   beginSync();
+  setInterval(updateDeletionCountdown, 1000);
 }
 
 adminForm?.addEventListener('submit', async (event) => {
@@ -95,6 +98,7 @@ async function unlock(key, restored = false) {
     await claimAdminKey(eventId, key);
     adminUnlocked = true;
     adminContent.classList.remove('hidden');
+    updateDeletionCountdown();
     adminStatus.textContent = restored ? '已使用本瀏覽器保存的密鑰解鎖。' : '管理權限已解鎖。';
     unsubscribeRegistrations?.();
     unsubscribeRegistrations = await subscribeRegistrations(eventId, (data) => {
@@ -116,6 +120,25 @@ function renderSummary() {
   renderDescription(summary.querySelector('[data-description]'), eventData.description_content, eventData.description_format);
   const closeButton = document.querySelector('#close-registration');
   if (closeButton) closeButton.disabled = eventData.status === 'closed';
+}
+
+function updateDeletionCountdown() {
+  if (!adminUnlocked || !eventData) return;
+  const expiresAt = Number(eventData.expires_at);
+  deletionDate.textContent = `預計刪除：${formatDateTime(expiresAt)}`;
+  const remaining = Math.max(0, expiresAt - Date.now());
+  if (remaining <= 0) {
+    deletionCountdown.textContent = '已到期，等待系統清除';
+    deletionCountdown.classList.add('expired');
+    return;
+  }
+  deletionCountdown.classList.remove('expired');
+  const totalSeconds = Math.floor(remaining / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  deletionCountdown.textContent = `${days} 天 ${pad(hours)} 時 ${pad(minutes)} 分 ${pad(seconds)} 秒`;
 }
 
 function fillScheduleForm() {
@@ -153,6 +176,7 @@ function csvCell(value) {
 }
 
 function safeFilename(value) { return String(value || 'event').replace(/[\\/:*?"<>|]/g, '-').slice(0, 80); }
+function pad(value) { return String(value).padStart(2, '0'); }
 function customFields() { return Object.entries(eventData?.custom_fields || {}).sort(([, a], [, b]) => Number(a.order) - Number(b.order)); }
 
 function handleError(error) {

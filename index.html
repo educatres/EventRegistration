@@ -52,6 +52,28 @@
         <ul id="recent-events" class="recent-list"></ul>
       </section>
     </main>
+
+    <button id="system-events-trigger" class="system-events-trigger" type="button" aria-label="查看系統活動" title="系統活動">🔑</button>
+
+    <dialog id="system-events-dialog" class="system-events-dialog">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">Firebase index</p>
+          <h2>目前系統上的所有活動</h2>
+        </div>
+        <button id="system-events-close" class="ghost-btn small-btn" type="button">關閉</button>
+      </div>
+      <div class="actions">
+        <button id="system-events-refresh" class="ghost-btn small-btn" type="button">重新整理</button>
+        <span id="system-events-status" class="muted-text" aria-live="polite"></span>
+      </div>
+      <div class="table-wrap system-events-table-wrap">
+        <table>
+          <thead><tr><th>Firebase ID</th><th>預計刪除日期時間</th><th>狀態</th></tr></thead>
+          <tbody id="system-events-body"></tbody>
+        </table>
+      </div>
+    </dialog>
     <script type="module" src="./js/index.js"></script>
   </body>
 </html>
